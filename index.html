@@ -1,0 +1,423 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1, maximum-scale=1, user-scalable=no">
+<title>凉城 60 MW 陆上风电项目 · 数字孪生（实测机位）</title>
+
+<link rel="stylesheet" href="libs/cesium/Widgets/widgets.css"
+      onerror="this.onerror=null;this.href='https://cdn.jsdelivr.net/npm/cesium@1.118.0/Build/Cesium/Widgets/widgets.css';">
+<script>window.CESIUM_BASE_URL = 'libs/cesium/';</script>
+<script src="libs/cesium/Cesium.js"></script>
+<script>
+  // 本地引擎缺失时回退 CDN
+  if (!window.Cesium) {
+    window.CESIUM_BASE_URL = 'https://cdn.jsdelivr.net/npm/cesium@1.118.0/Build/Cesium/';
+    document.write('<scr' + 'ipt src="https://cdn.jsdelivr.net/npm/cesium@1.118.0/Build/Cesium/Cesium.js"><\/scr' + 'ipt>');
+  }
+</script>
+
+<style>
+:root{
+  --bg:#070b14;
+  --panel:rgba(9,15,26,.90);
+  --panel-solid:#0b1220;
+  --line:rgba(34,211,238,.20);
+  --line-soft:rgba(120,160,200,.14);
+  --accent:#22d3ee;
+  --accent-dim:#0e7490;
+  --amber:#f5b942;
+  --red:#ef6b6b;
+  --green:#5fd0a8;
+  --text:#e9f3ff;
+  --muted:#8ba3bf;
+  --muted-2:#5f7a99;
+  --radius:10px;
+  --mono:"JetBrains Mono","Cascadia Mono",Consolas,"Courier New",monospace;
+}
+*{box-sizing:border-box;margin:0;padding:0}
+html,body{height:100%;overflow:hidden;background:var(--bg);color:var(--text);
+  font-family:"Segoe UI","Microsoft YaHei","PingFang SC",system-ui,sans-serif;
+  font-size:13px;-webkit-font-smoothing:antialiased}
+#cesiumContainer{position:absolute;inset:0;background:#05080f}
+#cesiumContainer canvas{filter:brightness(1.07) contrast(1.04) saturate(1.05)}
+.cesium-widget-credits{opacity:.5;font-size:10px!important}
+.cesium-credit-logoContainer{display:none!important}
+.cesium-viewer-bottom{left:auto!important;right:14px!important;bottom:10px!important}
+.cesium-viewer-scaleBar{display:block!important;opacity:.8;bottom:30px!important}
+
+/* ---------- 顶栏 ---------- */
+.topbar{position:absolute;top:0;left:0;right:0;height:64px;display:flex;align-items:center;
+  justify-content:space-between;padding:0 18px;z-index:30;pointer-events:none;
+  background:linear-gradient(180deg,rgba(4,8,15,.94) 0%,rgba(4,8,15,.55) 62%,rgba(4,8,15,0) 100%)}
+.brand{display:flex;align-items:center;gap:12px}
+.brand .mark{width:34px;height:34px;border-radius:9px;position:relative;
+  background:linear-gradient(145deg,rgba(34,211,238,.20),rgba(34,211,238,.03));
+  border:1px solid rgba(34,211,238,.38);display:grid;place-items:center}
+.brand .mark svg{width:18px;height:18px}
+.brand h1{font-size:15px;font-weight:600;letter-spacing:.4px;line-height:1.25}
+.brand p{font-size:11px;color:var(--muted);letter-spacing:.3px;margin-top:2px}
+.coords{font-family:var(--mono);font-size:10.5px;color:var(--muted);text-align:right;line-height:1.7;
+  letter-spacing:.2px}
+.coords b{color:var(--accent);font-weight:500}
+
+/* ---------- 面板 ---------- */
+.panel{position:absolute;top:74px;width:308px;background:var(--panel);
+  backdrop-filter:blur(14px);-webkit-backdrop-filter:blur(14px);
+  border:1px solid var(--line);border-radius:var(--radius);z-index:30;
+  box-shadow:0 18px 44px rgba(0,0,0,.55);overflow:hidden;
+  display:flex;flex-direction:column;max-height:calc(100vh - 148px)}
+.panel-left{left:16px}
+.panel-right{right:16px;width:330px}
+
+.panel-head{display:flex;align-items:center;justify-content:space-between;
+  padding:11px 14px;border-bottom:1px solid var(--line-soft);
+  background:linear-gradient(90deg,rgba(34,211,238,.07),transparent)}
+.panel-head h2{font-size:12px;font-weight:600;letter-spacing:1.2px;color:var(--accent)}
+.panel-head .tag{font-size:10px;color:var(--muted);font-family:var(--mono)}
+.panel-body{overflow-y:auto;padding:4px 0}
+.panel-body::-webkit-scrollbar{width:6px}
+.panel-body::-webkit-scrollbar-thumb{background:rgba(34,211,238,.25);border-radius:3px}
+.panel-body::-webkit-scrollbar-track{background:transparent}
+
+.block{padding:8px 14px;border-bottom:1px solid var(--line-soft)}
+.block:last-child{border-bottom:none}
+.block-title{font-size:10.5px;color:var(--muted);letter-spacing:1px;margin-bottom:8px;
+  display:flex;align-items:center;gap:6px}
+.block-title::before{content:"";width:2px;height:10px;background:var(--accent);border-radius:1px;opacity:.85}
+
+.row{display:flex;justify-content:space-between;align-items:baseline;gap:10px;
+  padding:2px 0;font-size:12px}
+.row .k{color:var(--muted);flex:0 0 auto}
+.row .v{font-family:var(--mono);font-size:11.5px;color:var(--text);text-align:right;
+  letter-spacing:.2px}
+.row .v.hl{color:var(--accent)}
+.row .v.warn{color:var(--amber)}
+.row .v.bad{color:var(--red)}
+.row .v.good{color:var(--green)}
+.row .unit{color:var(--muted);font-size:10px;margin-left:2px}
+
+.note{font-size:10px;line-height:1.5;color:var(--muted);margin-top:6px;
+  padding:6px 8px;border-left:2px solid rgba(245,185,66,.5);background:rgba(245,185,66,.05);
+  border-radius:0 4px 4px 0}
+.note.calm{border-left-color:rgba(34,211,238,.45);background:rgba(34,211,238,.04)}
+
+/* ---------- 机位清单 ---------- */
+.wt{display:grid;grid-template-columns:52px 1fr 62px;gap:9px;align-items:center;
+  padding:8px 14px;cursor:pointer;border-bottom:1px solid rgba(120,160,200,.07);
+  transition:background .16s;position:relative}
+.wt:hover{background:rgba(34,211,238,.07)}
+.wt.active{background:rgba(34,211,238,.11)}
+.wt.active::before{content:"";position:absolute;left:0;top:0;bottom:0;width:2px;background:var(--accent)}
+.wt .id{font-family:var(--mono);font-size:11px;font-weight:600;color:var(--accent)}
+.wt .id small{display:block;color:var(--muted-2);font-weight:400;font-size:9px;letter-spacing:.2px}
+.wt .mid{min-width:0}
+.wt .meta{font-size:10px;color:var(--muted);font-family:var(--mono);line-height:1.5;
+  white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
+.wt .meta span{color:#a9c2da}
+.wt .bar{height:3px;border-radius:2px;background:rgba(120,160,200,.16);margin-top:4px;overflow:hidden}
+.wt .bar i{display:block;height:100%;background:linear-gradient(90deg,#0e7490,#22d3ee);border-radius:2px}
+.wt .hrs{font-family:var(--mono);font-size:10.5px;text-align:right;color:#cfe6ff}
+
+/* ---------- 选中机位看板 ---------- */
+.detail{border-top:1px solid var(--line);background:rgba(34,211,238,.035);flex:none}
+.detail-head{display:flex;align-items:center;justify-content:space-between;padding:9px 14px 4px}
+.detail-head .d-id{font-family:var(--mono);font-size:13px;font-weight:600;color:var(--accent);
+  letter-spacing:.5px}
+.detail-head .d-cap{font-family:var(--mono);font-size:10px;color:var(--muted);
+  border:1px solid rgba(34,211,238,.3);border-radius:4px;padding:1px 6px}
+.detail-grid{display:grid;grid-template-columns:1fr 1fr;gap:0 12px;padding:2px 14px 6px}
+.detail-grid .row{padding:2.5px 0;font-size:11px}
+.detail-grid .row .k{font-size:10.5px}
+.detail-grid .row .v{font-size:10.5px}
+.detail .full{grid-column:1 / -1}
+
+/* ---------- 底栏 ---------- */
+.toolbar{position:absolute;left:50%;bottom:16px;transform:translateX(-50%);
+  display:flex;align-items:center;gap:6px;padding:7px 9px;z-index:30;
+  background:var(--panel);backdrop-filter:blur(14px);-webkit-backdrop-filter:blur(14px);
+  border:1px solid var(--line);border-radius:11px;box-shadow:0 14px 36px rgba(0,0,0,.6);
+  max-width:calc(100vw - 40px);overflow-x:auto}
+.toolbar::-webkit-scrollbar{height:0}
+.btn{display:flex;align-items:center;gap:6px;padding:6px 11px;border-radius:7px;cursor:pointer;
+  border:1px solid transparent;background:transparent;color:var(--muted);font-size:11.5px;
+  font-family:inherit;white-space:nowrap;transition:all .15s}
+.btn:hover{background:rgba(34,211,238,.09);color:var(--text)}
+.btn.on{background:rgba(34,211,238,.14);color:var(--accent);border-color:rgba(34,211,238,.35)}
+.btn svg{width:13px;height:13px;flex:none}
+.sep{width:1px;height:20px;background:var(--line-soft);margin:0 3px}
+.slider-wrap{display:flex;align-items:center;gap:8px;padding:0 8px}
+.slider-wrap label{font-size:10.5px;color:var(--muted);white-space:nowrap}
+input[type=range]{-webkit-appearance:none;width:84px;height:3px;border-radius:2px;
+  background:rgba(120,160,200,.25);outline:none}
+input[type=range]::-webkit-slider-thumb{-webkit-appearance:none;width:12px;height:12px;border-radius:50%;
+  background:var(--accent);cursor:pointer;box-shadow:0 0 8px rgba(34,211,238,.7)}
+.sv{font-family:var(--mono);font-size:10.5px;color:var(--accent);width:30px;text-align:right}
+
+/* ---------- 图例 ---------- */
+.legend{position:absolute;left:50%;bottom:64px;transform:translateX(-50%);
+  z-index:19;display:flex;align-items:center;gap:16px;flex-wrap:wrap;justify-content:center;
+  padding:6px 14px;max-width:calc(100vw - 700px);
+  background:var(--panel);backdrop-filter:blur(14px);border:1px solid var(--line);
+  border-radius:9px;font-size:10px;color:var(--muted);line-height:1.6;
+  box-shadow:0 10px 26px rgba(0,0,0,.45)}
+.legend .li{display:flex;align-items:center;gap:6px;white-space:nowrap}
+.legend i{width:12px;height:2px;border-radius:1px;flex:none}
+.legend i.dash{height:0;border-top:2px dashed currentColor;background:none}
+.legend em{font-style:normal;color:var(--muted)}
+
+/* ---------- 场景内机位看板 ---------- */
+#boards{position:absolute;inset:0;z-index:22;pointer-events:none;overflow:hidden}
+.board{position:absolute;left:0;top:0;transform:translate(-50%,-100%);
+  pointer-events:auto;cursor:pointer;
+  min-width:104px;padding:5px 8px 6px;border-radius:7px;
+  background:linear-gradient(180deg,rgba(8,17,29,.94),rgba(8,17,29,.80));
+  border:1px solid rgba(34,211,238,.30);
+  box-shadow:0 6px 20px rgba(0,0,0,.55);
+  font-family:var(--mono);font-size:10px;line-height:1.5;color:#cfe6ff;
+  white-space:nowrap;transition:border-color .15s,background .15s;will-change:transform}
+.board::after{content:"";position:absolute;left:50%;top:100%;width:1px;height:16px;
+  background:linear-gradient(180deg,rgba(34,211,238,.6),rgba(34,211,238,0))}
+.board .bd-head{display:flex;align-items:baseline;justify-content:space-between;gap:8px;
+  font-weight:600;font-size:10.5px;color:#7ee8fa;letter-spacing:.3px}
+.board .bd-head em{font-style:normal;font-size:9px;color:var(--muted);font-weight:400}
+.board .bd-body{margin-top:3px}
+.board .bd-l{display:flex;justify-content:space-between;gap:10px;color:var(--muted)}
+.board .bd-l b{color:#e9f3ff;font-weight:500}
+.board .bd-l b.a{color:var(--accent)}
+.board .bd-l i{font-style:normal;color:var(--muted-2);font-size:9px;margin-left:1px}
+.board .bd-coord{margin-top:3px;padding-top:3px;border-top:1px dashed rgba(120,160,200,.22);
+  font-size:9px;line-height:1.35;color:var(--muted-2);letter-spacing:.2px}
+.board.mini{min-width:0;padding:3px 6px 4px}
+.board.mini .bd-body{display:none}
+.board.mini::after{height:10px}
+.board:hover{border-color:rgba(34,211,238,.65)}
+.board.sel{border-color:#22d3ee;background:linear-gradient(180deg,rgba(11,32,50,.97),rgba(8,17,29,.88));
+  box-shadow:0 0 0 1px rgba(34,211,238,.35),0 10px 26px rgba(0,0,0,.65)}
+.board.hide{display:none}
+
+/* ---------- 底图源菜单 ---------- */
+.bm-pop{position:fixed;z-index:40;width:302px;padding:8px 0 6px;
+  background:rgba(9,15,26,.975);backdrop-filter:blur(18px);-webkit-backdrop-filter:blur(18px);
+  border:1px solid var(--line);border-radius:10px;box-shadow:0 16px 40px rgba(0,0,0,.65);
+  display:none}
+.bm-pop.open{display:block}
+.bm-pop .bm-title{padding:0 12px 7px;font-size:10px;letter-spacing:1.4px;color:var(--accent);
+  border-bottom:1px solid var(--line-soft);margin-bottom:4px}
+.bm-group{padding:7px 12px 3px;font-size:9.5px;letter-spacing:1.2px;color:var(--muted-2);
+  border-top:1px solid var(--line-soft);margin-top:3px}
+.bm-group:first-child{border-top:none;margin-top:0}
+.bm-item{display:flex;align-items:center;justify-content:space-between;gap:10px;width:100%;
+  padding:6px 12px;background:transparent;border:none;cursor:pointer;text-align:left;
+  font-family:inherit;color:var(--text);font-size:11.5px;transition:background .14s}
+.bm-item:hover{background:rgba(34,211,238,.09)}
+.bm-item.on{background:rgba(34,211,238,.13)}
+.bm-item.on .bm-n b{color:var(--accent)}
+.bm-item.dis{opacity:.45;cursor:not-allowed}
+.bm-item .bm-n{display:flex;flex-direction:column;gap:1px;line-height:1.35}
+.bm-item .bm-n b{font-weight:500;font-size:11.5px}
+.bm-item .bm-n em{font-style:normal;font-size:9.5px;color:var(--muted-2);font-family:var(--mono)}
+.bm-item .bm-r{font-family:var(--mono);font-size:9.5px;color:var(--muted);white-space:nowrap}
+.bm-item .dot{display:inline-block;width:6px;height:6px;border-radius:50%;background:var(--accent);
+  box-shadow:0 0 6px var(--accent);margin-right:7px;opacity:0;vertical-align:middle}
+.bm-item.on .dot{opacity:1}
+.bm-pop .bm-foot{padding:7px 12px 0;margin-top:4px;border-top:1px solid var(--line-soft);
+  font-size:9.5px;line-height:1.5;color:var(--muted-2)}
+
+/* ---------- 轻提示 ---------- */
+#toast{position:absolute;left:50%;top:78px;transform:translateX(-50%);z-index:70;
+  padding:9px 16px;border-radius:8px;font-size:12px;line-height:1.5;max-width:min(560px,80vw);
+  background:rgba(11,20,32,.96);border:1px solid rgba(245,185,66,.45);color:#ffe6b0;
+  box-shadow:0 12px 30px rgba(0,0,0,.6);opacity:0;visibility:hidden;transition:opacity .22s,visibility .22s}
+#toast.show{opacity:1;visibility:visible}
+
+/* ---------- 加载 / 错误 ---------- */
+#loader{position:absolute;inset:0;z-index:60;display:grid;place-items:center;
+  background:radial-gradient(circle at 50% 45%,#0c1626 0%,#05080f 70%);
+  transition:opacity .55s ease,visibility .55s}
+#loader.hide{opacity:0;visibility:hidden}
+.ld-inner{text-align:center;width:320px}
+.ld-ring{width:52px;height:52px;margin:0 auto 20px;border-radius:50%;
+  border:2px solid rgba(34,211,238,.13);border-top-color:var(--accent);
+  animation:spin 1.05s linear infinite}
+@keyframes spin{to{transform:rotate(360deg)}}
+.ld-title{font-size:13px;letter-spacing:2.4px;color:var(--accent);margin-bottom:8px;font-weight:500}
+.ld-sub{font-size:11px;color:var(--muted);font-family:var(--mono);min-height:16px}
+.ld-bar{margin-top:16px;height:2px;background:rgba(120,160,200,.16);border-radius:2px;overflow:hidden}
+.ld-bar i{display:block;height:100%;width:0;background:var(--accent);
+  box-shadow:0 0 10px var(--accent);transition:width .35s ease}
+.err-box{max-width:520px;padding:26px 30px;border:1px solid rgba(239,107,107,.35);
+  border-radius:12px;background:rgba(30,12,14,.72);color:#ffd9d9;line-height:1.8;font-size:12.5px}
+.err-box h3{color:#ff9b9b;font-size:14px;margin-bottom:10px;font-weight:600}
+.err-box code{font-family:var(--mono);background:rgba(0,0,0,.4);padding:1px 5px;border-radius:3px;font-size:11px}
+
+/* 小屏 */
+@media (max-width:1240px){
+  .panel{width:272px}
+  .panel-right{width:296px}
+}
+@media (max-width:960px){
+  .panel{display:none}
+  .legend{display:none}
+  .coords{display:none}
+}
+</style>
+</head>
+<body>
+<div id="cesiumContainer"></div>
+<div id="boards"></div>
+
+<header class="topbar">
+  <div class="brand">
+    <div class="mark">
+      <svg viewBox="0 0 24 24" fill="none" stroke="#22d3ee" stroke-width="1.6" stroke-linecap="round">
+        <path d="M12 21V9"/><circle cx="12" cy="5" r="2"/>
+        <path d="M12 9 6.5 12.5M12 9l5.5 3.5M12 9 9 3.5"/>
+      </svg>
+    </div>
+    <div>
+      <h1>陆上风电项目 · 数字孪生（实测机位）</h1>
+      <p id="projLine">内蒙古自治区 乌兰察布市 凉城县 六苏木镇</p>
+    </div>
+  </div>
+  <div class="coords" id="coordBar">
+    <div id="csLine">CGCS2000</div>
+    <div>原点 <b id="origLine">—</b></div>
+  </div>
+</header>
+
+<aside class="panel panel-left">
+  <div class="panel-head">
+    <h2>场址概况</h2>
+    <span class="tag" id="demTag">DEM 30 m</span>
+  </div>
+  <div class="panel-body">
+    <div class="block">
+      <div class="block-title">机组与装机</div>
+      <div class="row"><span class="k">装机容量</span><span class="v hl" id="capTotal">—</span></div>
+      <div class="row"><span class="k">机组台数</span><span class="v" id="wtNum">—</span></div>
+      <div class="row"><span class="k">单机容量</span><span class="v" id="capUnit">—</span></div>
+      <div class="row"><span class="k">叶轮直径</span><span class="v" id="rotorD">—</span></div>
+      <div class="row"><span class="k">轮毂高度</span><span class="v" id="hubH">—</span></div>
+      <div class="row"><span class="k">扫风面积</span><span class="v" id="swept">—</span></div>
+      <div class="row"><span class="k">比功率</span><span class="v" id="specPow">—</span></div>
+      <div class="note" id="rotorNote">—</div>
+    </div>
+
+    <div class="block">
+      <div class="block-title">场区与坐标</div>
+      <div class="row"><span class="k">坐标系</span><span class="v" id="crs">—</span></div>
+      <div class="row"><span class="k">场区范围</span><span class="v" id="siteExt">—</span></div>
+      <div class="row"><span class="k">控制范围面积</span><span class="v" id="siteArea">—</span></div>
+      <div class="row"><span class="k">地面高程</span><span class="v" id="elevRange">—</span></div>
+      <div class="row"><span class="k">相对高差</span><span class="v" id="relief">—</span></div>
+      <div class="row"><span class="k">平均坡度</span><span class="v" id="meanSlope">—</span></div>
+      <div class="row"><span class="k">最大坡度</span><span class="v" id="maxSlope">—</span></div>
+      <div class="row"><span class="k">坐标往返残差</span><span class="v good" id="chkCoord">—</span></div>
+      <div class="row"><span class="k">最小机间距</span><span class="v" id="minDist">—</span></div>
+      <div class="row"><span class="k">折合叶轮倍数</span><span class="v" id="minDistD">—</span></div>
+      <div class="row"><span class="k">高程差（DEM−实测）</span><span class="v" id="demDiff">—</span></div>
+      <div class="note calm">机位位置与高程以数据表 2000 坐标为准；地形模型与之的差值即上表「高程差」，用于判断三维场景与实测资料的贴合程度。</div>
+    </div>
+
+    <div class="block">
+      <div class="block-title">发电量（实测数据表）</div>
+      <div class="row"><span class="k">轮毂平均风速</span><span class="v" id="vMean">—</span></div>
+      <div class="row"><span class="k">尾流后平均风速</span><span class="v" id="vWake">—</span></div>
+      <div class="row"><span class="k">理论发电量</span><span class="v" id="grossAep">—</span></div>
+      <div class="row"><span class="k">尾流损失（表值）</span><span class="v warn" id="wakeL">—</span></div>
+      <div class="row"><span class="k">年上网电量</span><span class="v hl" id="netAep">—</span></div>
+      <div class="row"><span class="k">等效满发小时</span><span class="v hl" id="hours">—</span></div>
+      <div class="row"><span class="k">容量系数（净）</span><span class="v" id="cfn">—</span></div>
+      <div class="row"><span class="k">综合折减</span><span class="v warn" id="reduc">—</span></div>
+    </div>
+
+  </div>
+</aside>
+
+<aside class="panel panel-right">
+  <div class="panel-head">
+    <h2>机位清单</h2>
+    <span class="tag" id="wtCount">—</span>
+  </div>
+  <div class="panel-body" id="wtList"></div>
+  <div class="detail" id="wtDetail"></div>
+</aside>
+
+<footer class="toolbar">
+  <button class="btn on" id="btnSpin" title="叶轮旋转动画">
+    <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.7" stroke-linecap="round">
+      <circle cx="12" cy="12" r="2.4"/><path d="M12 9.6V3M9.9 13.2 6.2 19.4M14.1 13.2l3.7 6.2"/>
+    </svg><span>叶轮旋转</span>
+  </button>
+  <button class="btn on" id="btnBoards" title="机位看板">
+    <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.7" stroke-linecap="round">
+      <rect x="3.5" y="5" width="17" height="13" rx="1.6"/><path d="M7 9.5h6M7 13h9"/></svg>
+    <span>看板</span>
+  </button>
+  <button class="btn on" id="btnBoundary" title="场区控制范围">
+    <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.7"><rect x="3.5" y="3.5" width="17" height="17" rx="1.5"/></svg>
+    <span>场区边界</span>
+  </button>
+  <button class="btn on" id="btnRoad" title="场内道路（最小生成树）">
+    <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.7" stroke-linecap="round">
+      <path d="M6 21c0-6 3-7 6-9s6-3 6-9"/></svg><span>道路</span>
+  </button>
+  <button class="btn on" id="btnGrid" title="35 kV 集电线路">
+    <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.7" stroke-linecap="round">
+      <path d="M4 18h16M8 18v-5M16 18v-5M12 13V7M4 18l8-11 8 11"/></svg><span>集电线路</span>
+  </button>
+  <div class="sep"></div>
+  <button class="btn on" id="btnBase" title="底图源切换">
+    <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.7" stroke-linecap="round">
+      <path d="M3 7.5 12 3l9 4.5-9 4.5-9-4.5Z"/><path d="M3 12l9 4.5 9-4.5"/><path d="M3 16.5 12 21l9-4.5"/></svg>
+    <span id="bmLabel">底图 · 卫星</span>
+  </button>
+  <div class="sep"></div>
+  <div class="slider-wrap">
+    <label>叶轮转速</label>
+    <input type="range" id="rgSpeed" min="0.2" max="2" step="0.1" value="1">
+    <span class="sv" id="spdVal">1.0×</span>
+  </div>
+  <div class="sep"></div>
+  <button class="btn" id="btnHome" title="复位视角">
+    <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.7" stroke-linecap="round">
+      <path d="M3 11l9-7 9 7M6 10v10h12V10"/></svg><span>复位</span>
+  </button>
+  <button class="btn" id="btnTop" title="俯视全场">
+    <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.7">
+      <rect x="3.5" y="3.5" width="17" height="17" rx="1.5"/><path d="M3.5 12h17M12 3.5v17"/></svg>
+    <span>俯视</span>
+  </button>
+</footer>
+
+<div class="legend">
+  <div class="li"><i style="background:#ffbe2e"></i><em>场区控制范围</em></div>
+  <div class="li"><i style="background:#22d3ee"></i><em>35 kV 集电线路</em></div>
+  <div class="li"><i style="background:#9aa7b8"></i><em>场内道路</em></div>
+  <div class="li"><i style="background:#f5b942"></i><em>110 kV 升压站</em></div>
+</div>
+
+<div class="bm-pop" id="bmPop">
+  <div class="bm-title">底图源　BASEMAP</div>
+  <div id="bmList"></div>
+  <div class="bm-foot" id="bmFoot">影像均为公开服务，成像时间以源方为准，不代表当前地表。</div>
+</div>
+
+<div id="toast"></div>
+
+<div id="loader">
+  <div class="ld-inner" id="ldInner">
+    <div class="ld-ring"></div>
+    <div class="ld-title">正在构建数字孪生场景</div>
+    <div class="ld-sub" id="ldSub">加载三维引擎…</div>
+    <div class="ld-bar"><i id="ldBar"></i></div>
+  </div>
+</div>
+
+<script src="js/config.js"></script>
+<script src="js/config.local.js" onerror="this.remove()"></script>
+<script src="data/site-data.js"></script>
+<script src="js/app.js"></script>
+</body>
+</html>

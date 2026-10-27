@@ -1,0 +1,82 @@
+{
+  "version": 0.6,
+  "generator": "Overpass API 0.7.62.11 87bfad18",
+  "osm3s": {
+    "timestamp_osm_base": "2026-10-20T00:55:50Z",
+    "copyright": "The data included in this document is from www.openstreetmap.org. The data is made available under ODbL."
+  },
+  "elements": [
+
+{
+  "type": "node",
+  "id": 6279124681,
+  "lat": 40.3946708,
+  "lon": 112.7462455,
+  "tags": {
+    "name": "十九号",
+    "name:en": "Shijiuhao",
+    "name:zh": "十九号",
+    "old_name": "十九号乡",
+    "place": "village",
+    "source:name": "GNS"
+  }
+},
+{
+  "type": "node",
+  "id": 6279125074,
+  "lat": 40.4434926,
+  "lon": 112.7049069,
+  "tags": {
+    "place": "village"
+  }
+},
+{
+  "type": "way",
+  "id": 670522881,
+  "center": {
+    "lat": 40.4418462,
+    "lon": 112.7179644
+  },
+  "tags": {
+    "highway": "tertiary"
+  }
+},
+{
+  "type": "way",
+  "id": 670522888,
+  "center": {
+    "lat": 40.4122699,
+    "lon": 112.7415276
+  },
+  "tags": {
+    "highway": "tertiary",
+    "source": "digitalGlobe Premium"
+  }
+},
+{
+  "type": "way",
+  "id": 865024674,
+  "center": {
+    "lat": 40.4542213,
+    "lon": 112.6972367
+  },
+  "tags": {
+    "bridge": "yes",
+    "highway": "tertiary",
+    "layer": "1"
+  }
+},
+{
+  "type": "way",
+  "id": 865024675,
+  "center": {
+    "lat": 40.4693412,
+    "lon": 112.6825919
+  },
+  "tags": {
+    "highway": "tertiary"
+  }
+}
+
+  ]
+}
