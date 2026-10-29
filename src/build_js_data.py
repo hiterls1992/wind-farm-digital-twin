@@ -12,12 +12,15 @@
   3) 把分级融合权重写入数据文件，前端不再硬编码任何半径，避免两边参数漂移。
 """
 import json
+from project_io import ROOT, atomic_text, write_json, finite, validate_levels, validate_assets
 import math
 import os
 
-DEM_JSON = "data/dem.json"
-SITE_JSON = "data/site.json"
-OUT_JS = "data/site-data.js"
+DEM_JSON = ROOT / "data/dem.json"
+SITE_JSON = ROOT / "data/site.json"
+GRID_JSON = ROOT / "data/gridline.json"
+TOWER_TYPES = ROOT / "data/tower-types.json"
+OUT_JS = ROOT / "data/site-data.js"
 
 # 分级融合权重：某一级在 r <= inner × half 时权重为 1，在 r >= half 时降为 0
 # 中间用 smoothstep 过渡。此值由本脚本写入 site-data.js，前端直接读取。
@@ -96,6 +99,10 @@ def main():
     with open(SITE_JSON, encoding="utf-8") as f:
         site = json.load(f)
 
+    validate_levels(dem["levels"])
+    validate_assets(site["turbines"], ("x", "y", "ground", "net_mwh"))
+    if site["machine"]["count"] != len(site["turbines"]):
+        raise ValueError("机组数量不一致")
     levels = dem["levels"]
     # 远场基准高程：取 L0 四边均值，避免把某一角的山头当作基准
     l0 = levels["L0"]
@@ -147,6 +154,36 @@ def main():
     site["checks"]["dem_diff_max_m"] = round(max(diffs), 1)
     site["checks"]["dem_diff_mean_m"] = round(sum(diffs) / len(diffs), 1)
 
+    # ---------- 集电线路杆塔（若存在 gridline.json）
+    grid = None
+    if os.path.exists(GRID_JSON):
+        with open(GRID_JSON, encoding="utf-8") as f:
+            grid = json.load(f)
+        validate_assets(grid["towers"], ("x", "y", "lat", "lon"))
+        tground = dem.get("towerGround", {})
+        tdiffs = []
+        for t in grid["towers"]:
+            # ground：分级网格高度——场景里塔基就落在这个高度上，保证与地形面严格贴合；
+            # ground_aster：ASTER 30 m 源数据点值——独立校核值，两者差值并列显示。
+            t["ground"] = round(height(t["x"], t["y"]), 1)
+            t["ground_aster"] = None if t.get("position_adjustment") else tground.get(t["id"])
+            if t["ground_aster"] is not None:
+                t["dem_diff"] = round(t["ground"] - t["ground_aster"], 1)
+                tdiffs.append(abs(t["dem_diff"]))
+            else:
+                t["dem_diff"] = None
+            t["slope"] = round(slope_at(height, t["x"], t["y"]), 1)
+
+        grounds = [t["ground"] for t in grid["towers"]]
+        grid["stats"]["ground_min"] = round(min(grounds))
+        grid["stats"]["ground_max"] = round(max(grounds))
+        grid["stats"]["ground_mean"] = round(sum(grounds) / len(grounds))
+        if tdiffs:
+            grid["stats"]["grid_vs_aster_max_m"] = round(max(tdiffs), 1)
+            grid["stats"]["grid_vs_aster_mean_m"] = round(sum(tdiffs) / len(tdiffs), 1)
+        grid["stats"]["ground_source"] = ("塔基落地高程取分级 DEM 网格（保证与地形面贴合）；"
+                                          "ASTER 30 m 点采样值作为独立校核")
+
     payload = {
         "center": {"lat": dem["center"]["lat"], "lon": dem["center"]["lon"]},
         "centerGcj02": dem["center_gcj02"],
@@ -155,8 +192,21 @@ def main():
         "terrainBlend": {"inner": BLEND_INNER, "base": base},
         "site": site,
     }
+    hourly_path = ROOT / "data/hourly-energy.json"
+    if hourly_path.exists():
+        with hourly_path.open(encoding="utf-8") as stream:
+            payload["hourlyEnergy"] = json.load(stream)
+    roads_path = ROOT / "data/roads.json"
+    if roads_path.exists():
+        with roads_path.open(encoding="utf-8") as stream:
+            payload["roads"] = json.load(stream)
+    if grid:
+        payload["gridline"] = grid
+        if os.path.exists(TOWER_TYPES):
+            with open(TOWER_TYPES, encoding="utf-8") as f:
+                payload["towerTypes"] = json.load(f)["types"]
 
-    with open(OUT_JS, "w", encoding="utf-8") as f:
+    with atomic_text(OUT_JS) as f:
         f.write("/* 自动生成，勿手工编辑 —— 由 src/build_js_data.py 生成 */\n")
         f.write("window.SITE_DATA = ")
         json.dump(payload, f, ensure_ascii=False, separators=(",", ":"))
@@ -170,6 +220,15 @@ def main():
     for t in site["turbines"]:
         print("  %-6s 实测 %7.2f m  DEM %7.1f m  差 %+5.1f m  坡度 %4.1f°"
               % (t["id"], t["ground"], t["ground_dem"], t["dem_diff"], t["slope"]))
+
+    if grid:
+        gs = grid["stats"]
+        print("集电线路杆塔 %d 基（耐张 %d / 直线 %d），线路 %.2f km，档距 %.0f ~ %.0f m"
+              % (gs["count"], gs["tension"], gs["suspension"],
+                 gs["length_total_m"] / 1000, gs["span_min_m"], gs["span_max_m"]))
+        print("  塔基高程 %.0f ~ %.0f m（均 %.0f）；与 ASTER 点采样最大差 %.1f m、平均 %.1f m"
+              % (gs["ground_min"], gs["ground_max"], gs["ground_mean"],
+                 gs.get("grid_vs_aster_max_m", 0), gs.get("grid_vs_aster_mean_m", 0)))
     print("已生成 %s，%.1f KB" % (OUT_JS, os.path.getsize(OUT_JS) / 1024))
 
 

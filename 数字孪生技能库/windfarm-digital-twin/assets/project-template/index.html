@@ -1,0 +1,1125 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1, maximum-scale=1, user-scalable=no">
+<title>风电项目 · 数字孪生</title>
+
+<link rel="stylesheet" href="libs/cesium/Widgets/widgets.css"
+      onerror="this.onerror=null;this.href='https://cdn.jsdelivr.net/npm/cesium@1.118.0/Build/Cesium/Widgets/widgets.css';">
+<script>window.CESIUM_BASE_URL = 'libs/cesium/';</script>
+<script src="libs/cesium/Cesium.js"></script>
+<script>
+  if (!window.Cesium) {
+    window.CESIUM_BASE_URL = 'https://cdn.jsdelivr.net/npm/cesium@1.118.0/Build/Cesium/';
+    document.write('<scr' + 'ipt src="https://cdn.jsdelivr.net/npm/cesium@1.118.0/Build/Cesium/Cesium.js"><\/scr' + 'ipt>');
+  }
+</script>
+
+<style>
+/* =============================================================================
+ * 设计系统 · 工业大屏
+ * 三侧贴边分栏（左 / 右 / 下），中间留给三维场景。
+ * 主色蓝绿，辅助黄紫红；卡片带编号切角，1px 细边，无大圆角。
+ * ========================================================================== */
+:root{
+  --bg:#04070b;
+  --panel:#070d14;
+  --panel-2:#0a121b;
+  --card:#0a141d;
+  --card-2:#0d1a25;
+
+  --line:rgba(56,189,248,.14);
+  --line-2:rgba(56,189,248,.28);
+  --line-3:rgba(56,189,248,.45);
+
+  --t1:#e6f0fa;
+  --t2:#8fabc4;
+  --t3:#587287;
+
+  --blue:#2f9dff;
+  --blue-d:rgba(47,157,255,.14);
+  --cyan:#22d3ee;
+  --green:#2fe0a0;
+  --yellow:#fbbf24;
+  --purple:#a78bfa;
+  --red:#ff6b6b;
+
+  --wl:322px;      /* 左列宽 */
+  --wr:322px;      /* 右列宽 */
+  --ht:54px;       /* 顶栏高 */
+  --hc:254px;      /* 底部控制台高 */
+
+  --mono:"Cascadia Mono","JetBrains Mono",Consolas,"Courier New",monospace;
+  --sans:"Microsoft YaHei","PingFang SC","Segoe UI",system-ui,sans-serif;
+  --dur:.16s;
+}
+
+*{box-sizing:border-box;margin:0;padding:0}
+html,body{height:100%;overflow:hidden;background:var(--bg);color:var(--t1);
+  font-family:var(--sans);font-size:13px;-webkit-font-smoothing:antialiased}
+
+body{
+  display:grid;
+  grid-template-columns:var(--wl) minmax(0,1fr) var(--wr);
+  grid-template-rows:var(--ht) minmax(0,1fr) var(--hc);
+  /* 注意：不要给 grid-template-columns 加 transition。
+     含 minmax(0,1fr) 的轨道无法插值，Chrome 会保留旧值——变量已变而布局不更新。 */
+}
+body.lh-off{--wl:0px}
+body.rh-off{--wr:0px}
+body.dh-off{--hc:34px}
+
+button{font-family:inherit;color:inherit;background:none;border:none;cursor:pointer}
+:focus-visible{outline:2px solid var(--blue);outline-offset:1px}
+::-webkit-scrollbar{width:5px;height:5px}
+::-webkit-scrollbar-thumb{background:rgba(56,189,248,.22)}
+::-webkit-scrollbar-track{background:transparent}
+
+/* ============================== 顶栏 ============================== */
+.topbar{grid-area:1/1/2/4;display:flex;align-items:center;gap:0;padding:0 12px;
+  background:linear-gradient(180deg,#060c12,#04080d);
+  border-bottom:1px solid var(--line);position:relative;z-index:30;min-width:0}
+.topbar::after{content:"";position:absolute;left:0;right:0;bottom:-1px;height:1px;
+  background:linear-gradient(90deg,transparent,rgba(47,157,255,.55) 25%,rgba(47,224,160,.45) 70%,transparent);
+  pointer-events:none}
+
+.brand{display:flex;align-items:center;gap:10px;flex:0 0 auto;min-width:0;
+  width:calc(var(--wl) - 12px)}
+.brand-mark{width:30px;height:30px;display:grid;place-items:center;flex:none;
+  background:linear-gradient(135deg,rgba(47,157,255,.18),rgba(47,224,160,.08));
+  border:1px solid rgba(47,157,255,.42);position:relative}
+.brand-mark::before{content:"";position:absolute;inset:3px;border:1px solid rgba(47,157,255,.20)}
+.brand-mark svg{width:24px;height:24px;position:relative}
+.brand-text{min-width:0}
+.brand-text h1{font-size:15.5px;font-weight:700;letter-spacing:1.2px;line-height:1.15;
+  white-space:nowrap;overflow:hidden;text-overflow:ellipsis;
+  background:linear-gradient(90deg,#eaf6ff,#9ed8ff 60%,#7ff0cd);
+  -webkit-background-clip:text;background-clip:text;color:transparent}
+
+.nav{display:flex;align-items:stretch;gap:1px;height:100%;margin-left:0;flex:0 0 auto}
+.tab{position:relative;padding:0 18px;font-size:12.5px;color:var(--t2);letter-spacing:.5px;
+  transition:color var(--dur),background var(--dur);
+  background:linear-gradient(180deg,rgba(47,157,255,.03),transparent)}
+.tab:hover{color:var(--t1);background:rgba(47,157,255,.08)}
+.tab.on{color:#05121b;font-weight:600;
+  background:linear-gradient(180deg,#5fd0ff,#22d3ee);box-shadow:0 0 18px -6px rgba(34,211,238,.9)}
+.tab.on::after{content:"";position:absolute;left:0;right:0;bottom:0;height:2px;background:#7ff0cd}
+
+.bm-wrap{position:relative;flex:0 0 auto;margin-left:2px}
+.bm-btn{height:28px;padding:0 9px;gap:6px;font-size:11.5px}
+.bm-btn .car{width:11px;height:11px;transition:transform .18s ease;opacity:.8}
+.bm-wrap.open .bm-btn .car{transform:rotate(180deg)}
+.bm-wrap.open .bm-btn{border-color:var(--line-3);color:#fff;
+  background:linear-gradient(180deg,rgba(47,157,255,.30),rgba(47,157,255,.12))}
+.bm-pop{position:absolute;top:calc(100% + 13px);right:0;z-index:60;width:396px;display:none;
+  padding:8px;background:#060d14;border:1px solid var(--line-2);
+  box-shadow:0 18px 44px -12px rgba(0,0,0,.92),0 0 30px -18px rgba(34,211,238,.7);
+  backdrop-filter:blur(16px)}
+.bm-pop::before{content:"";position:absolute;left:0;right:0;top:-1px;height:1px;
+  background:linear-gradient(90deg,transparent,rgba(34,211,238,.85),transparent)}
+.bm-wrap.open .bm-pop{display:grid;grid-template-columns:1fr 1fr;gap:4px}
+.bm-pop .bm-head{grid-column:1/-1;display:flex;align-items:center;justify-content:space-between;
+  padding:0 2px 6px;font-size:9px;letter-spacing:1px;color:var(--t3);font-family:var(--mono)}
+.bm-pop .bm-head b{color:var(--t2);font-weight:400;letter-spacing:.5px;font-size:10px}
+.bm-pop .bm-opt{min-height:46px;padding:6px 10px}
+.bm-pop .bm-opt b{font-size:12px}
+.bm-pop .bm-opt em{font-size:9px}
+
+.top-right{margin-left:auto;display:flex;align-items:center;gap:10px;flex:0 0 auto;min-width:0}
+
+.icon-btn{width:30px;height:30px;display:grid;place-items:center;color:var(--t2);
+  border:1px solid transparent;transition:all var(--dur)}
+.icon-btn:hover{color:var(--blue);border-color:var(--line-2);background:var(--blue-d)}
+.icon-btn.on{color:var(--cyan);border-color:var(--line-3);background:var(--blue-d)}
+.icon-btn svg{width:15px;height:15px}
+
+.btn-hz{display:inline-flex;align-items:center;gap:6px;height:30px;padding:0 12px;
+  font-size:12px;color:var(--t1);letter-spacing:.5px;border:1px solid var(--line-2);
+  background:linear-gradient(180deg,rgba(47,157,255,.16),rgba(47,157,255,.05));
+  transition:all var(--dur);white-space:nowrap}
+.btn-hz:hover{border-color:var(--line-3);color:#fff;
+  background:linear-gradient(180deg,rgba(47,157,255,.28),rgba(47,157,255,.10))}
+.btn-hz svg{width:14px;height:14px}
+
+/* ============================== 侧栏 ============================== */
+.side{display:flex;flex-direction:column;min-width:0;min-height:0;background:var(--panel);
+  position:relative;z-index:20;overflow:hidden;transition:opacity .16s ease}
+.side.left{grid-area:2/1/4/2;border-right:1px solid var(--line)}
+.side.right{grid-area:2/3/4/4;border-left:1px solid var(--line)}
+body.lh-off .side.left,body.rh-off .side.right{opacity:0;pointer-events:none}
+
+.edge{position:fixed;top:50%;transform:translateY(-50%);z-index:26;width:12px;height:150px;
+  background:linear-gradient(180deg,#4db8ff,#22d3ee 55%,#2fe0a0);
+  border:1px solid rgba(120,225,255,.9);cursor:pointer;opacity:0;pointer-events:none;
+  box-shadow:0 0 16px -2px rgba(34,211,238,.85);
+  transition:width .18s ease,box-shadow .18s ease;
+  display:flex;align-items:center;justify-content:center;overflow:hidden}
+.edge i{font-style:normal;font-size:9px;letter-spacing:2px;color:#04121b;writing-mode:vertical-rl;
+  opacity:0;transition:opacity .15s ease;white-space:nowrap}
+body.lh-off .edge.left{left:0;opacity:1;pointer-events:auto}
+body.rh-off .edge.right{right:0;opacity:1;pointer-events:auto}
+.edge:hover{width:26px;box-shadow:0 0 24px 0 rgba(34,211,238,1)}
+.edge:hover i{opacity:1}
+
+.col-head{height:30px;flex:none;display:flex;align-items:center;gap:8px;padding:0 6px 0 9px;
+  background:linear-gradient(90deg,rgba(47,157,255,.16),rgba(47,157,255,.02) 62%,transparent);
+  border-bottom:1px solid var(--line);position:relative}
+.col-head::before{content:"";width:3px;height:12px;background:linear-gradient(180deg,var(--cyan),var(--blue));
+  box-shadow:0 0 10px rgba(34,211,238,.8);flex:none}
+.col-head .ch-t{font-size:12px;font-weight:600;letter-spacing:1px;color:#d8ecff;white-space:nowrap}
+.col-head .ch-e{font-size:8.5px;letter-spacing:1.2px;color:rgba(56,189,248,.55);
+  font-family:var(--mono);white-space:nowrap}
+.col-head .sp{flex:1}
+.col-head .ch-s{font-size:9.5px;font-family:var(--mono);color:var(--t3);white-space:nowrap}
+
+.col-body{flex:1;min-height:0;overflow-y:auto;overflow-x:hidden;padding:8px 8px 6px;
+  display:flex;flex-direction:column;gap:8px}
+
+/* ============================== 卡片 ============================== */
+.card{position:relative;flex:0 0 auto;border:1px solid var(--line);
+  background:linear-gradient(180deg,var(--card) 0%,var(--panel) 100%);
+  display:flex;flex-direction:column;min-width:0}
+.card::before{content:"";position:absolute;left:-1px;top:-1px;width:2px;height:34px;
+  background:linear-gradient(180deg,var(--cyan),rgba(34,211,238,0));z-index:1}
+.card.grow{flex:1 1 auto;min-height:96px}
+
+.card-h{height:30px;flex:none;display:flex;align-items:center;gap:8px;padding:0 8px 0 0;
+  border-bottom:1px solid var(--line);position:relative;
+  background:linear-gradient(90deg,rgba(47,157,255,.13),rgba(47,157,255,.02) 55%,transparent)}
+.card-h .idx{flex:none;font-family:var(--mono);font-size:10.5px;font-weight:700;color:#03121b;
+  padding:3px 8px 3px 11px;letter-spacing:.5px;
+  background:linear-gradient(120deg,#7ff0cd,#22d3ee 55%,#2f9dff);
+  clip-path:polygon(7px 0,100% 0,100% 100%,0 100%)}
+.card-h h3{font-size:12px;font-weight:600;letter-spacing:.8px;color:#dcefff;white-space:nowrap;
+  overflow:hidden;text-overflow:ellipsis}
+.card-h em{margin-left:auto;font-style:normal;font-size:8px;letter-spacing:1px;
+  color:rgba(56,189,248,.5);font-family:var(--mono);white-space:nowrap;
+  overflow:hidden;text-overflow:ellipsis}
+.card-h .tag{flex:none;font-size:8.5px;padding:1px 5px;letter-spacing:.5px;
+  border:1px solid rgba(251,191,36,.45);color:var(--yellow);background:rgba(251,191,36,.10)}
+.card-h .tag.g{border-color:rgba(47,224,160,.45);color:var(--green);background:rgba(47,224,160,.10)}
+.card-h .tag.p{border-color:rgba(167,139,250,.45);color:var(--purple);background:rgba(167,139,250,.10)}
+
+.card-b{padding:8px 9px;min-width:0}
+
+/* KPI 四宫格 */
+.kpi-grid{display:grid;grid-template-columns:1fr 1fr;gap:6px}
+.kpi{position:relative;padding:7px 9px 8px;border:1px solid rgba(56,189,248,.11);
+  background:linear-gradient(160deg,rgba(47,157,255,.10),rgba(47,157,255,.02))}
+.kpi::after{content:"";position:absolute;right:0;top:0;width:7px;height:7px;
+  border-top:1px solid rgba(56,189,248,.5);border-right:1px solid rgba(56,189,248,.5)}
+.kpi-k{display:block;font-size:9.5px;color:var(--t3);letter-spacing:.5px}
+.kpi-v{display:flex;align-items:baseline;gap:3px;margin-top:2px;white-space:nowrap}
+.kpi-v b{font-family:var(--mono);font-size:22px;font-weight:600;letter-spacing:-.6px;
+  line-height:1.05;color:var(--blue);flex:none}
+.kpi-v i{font-style:normal;font-size:9px;color:var(--t3)}
+.kpi.hl .kpi-v b{color:var(--green);text-shadow:0 0 16px rgba(47,224,160,.45)}
+
+/* 键值行 */
+.kv{display:flex;flex-direction:column}
+.kv>div{display:flex;justify-content:space-between;align-items:baseline;gap:10px;
+  padding:3.5px 0;border-bottom:1px dashed rgba(56,189,248,.10);font-size:11.5px}
+.kv>div:last-child{border-bottom:none}
+.kv dt{color:var(--t3);flex:0 0 auto;font-size:11px}
+.kv dd{color:#dceaf7;text-align:right;font-family:var(--mono);font-size:11px;min-width:0;
+  white-space:nowrap}
+.kv dd.txt{font-family:var(--sans);font-size:11.5px;max-width:66%;white-space:normal;line-height:1.4;
+  overflow-wrap:anywhere}
+.kv dd .u{color:var(--t3);font-size:9px;margin-left:2px}
+.kv dd.ok{color:var(--green)}
+.kv dd.warn{color:var(--yellow)}
+.kv dd.bad{color:var(--red)}
+.kv dd.ac{color:var(--cyan)}
+
+/* 机位清单 */
+.wt-list{display:flex;flex-direction:column;padding:2px 0}
+.wt{display:grid;grid-template-columns:48px 1fr 54px;gap:7px;align-items:center;
+  padding:5px 8px;cursor:pointer;transition:background var(--dur);position:relative}
+.wt::before{content:"";position:absolute;left:0;top:0;bottom:0;width:2px;background:transparent}
+.wt:hover{background:rgba(47,157,255,.07)}
+.wt.on{background:linear-gradient(90deg,rgba(47,157,255,.20),rgba(47,157,255,.03))}
+.wt.on::before{background:linear-gradient(180deg,var(--cyan),var(--blue));
+  box-shadow:0 0 10px rgba(34,211,238,.9)}
+.wt-id{font-family:var(--mono);font-size:11px;font-weight:600;color:var(--t2);letter-spacing:.3px}
+.wt.on .wt-id{color:var(--cyan)}
+.wt-mid{min-width:0}
+.wt-val{font-family:var(--mono);font-size:11px;color:#d6e8f7}
+.wt-val span{color:var(--t3);font-size:9px;margin-left:2px}
+.wt-bar{height:4px;background:rgba(56,189,248,.10);margin-top:4px;overflow:hidden}
+.wt-bar i{display:block;height:100%;background:linear-gradient(90deg,#1f6f9e,var(--cyan));
+  transition:width .25s ease}
+.wt-h{font-family:var(--mono);font-size:10.5px;color:var(--t2);text-align:right}
+.wt-h em{display:block;font-style:normal;font-size:8.5px;color:var(--t3);letter-spacing:.3px}
+
+.list-stat{display:flex;flex-direction:column;gap:3px;padding:7px 9px;
+  border-top:1px solid var(--line);background:rgba(47,157,255,.03);flex:none}
+.list-stat>div{display:flex;align-items:baseline;justify-content:space-between;gap:8px;
+  font-size:10px;color:var(--t3)}
+.list-stat b{color:#dceaf7;font-family:var(--mono);font-weight:500;margin-left:auto}
+.list-stat em{font-style:normal;color:var(--t3);font-family:var(--mono);min-width:56px;text-align:right}
+
+.list-head{display:flex;align-items:center;justify-content:space-between;gap:8px;
+  padding:5px 9px;border-bottom:1px solid var(--line);flex:none}
+.list-head .hint{font-size:9.5px;color:var(--t3);min-width:0;overflow:hidden;
+  text-overflow:ellipsis;white-space:nowrap}
+.link-btn{flex:none;font-size:9.5px;color:var(--cyan);padding:1px 6px;
+  border:1px solid rgba(34,211,238,.35);letter-spacing:.3px}
+.link-btn:hover{background:rgba(34,211,238,.14);color:#fff}
+
+/* 占位卡片 */
+.card.ph{border-style:dashed;border-color:rgba(56,189,248,.20);
+  background:linear-gradient(180deg,rgba(10,20,29,.7),rgba(7,13,20,.7))}
+.card.ph::before{background:linear-gradient(180deg,#38566b,transparent)}
+.card.ph .card-h{background:none}
+.card.ph .card-h .idx{background:linear-gradient(120deg,#243647,#1b2b3a);color:#6f93ad}
+.card.ph .card-h h3{color:#7b96ab}
+.ph-b{flex:1;display:flex;flex-direction:column;align-items:center;justify-content:center;
+  gap:5px;min-height:56px;position:relative;overflow:hidden}
+.ph-b::before{content:"";position:absolute;inset:0;
+  background-image:repeating-linear-gradient(45deg,rgba(56,189,248,.05) 0 1px,transparent 1px 9px)}
+.ph-b span{font-size:10px;color:#4f6b80;letter-spacing:1px;position:relative}
+.ph-b em{font-style:normal;font-size:8.5px;color:#3d5566;font-family:var(--mono);
+  letter-spacing:1px;position:relative}
+
+/* 页面切换（左列） */
+.lp{display:none;flex-direction:column;gap:8px;flex:1 1 auto;min-height:0}
+.lp.on{display:flex}
+
+/* ============================== 场景 ============================== */
+.nav-hint{position:absolute;bottom:12px;left:50%;transform:translateX(-50%);white-space:nowrap;pointer-events:none;z-index:6;padding:6px 12px;border-radius:4px;background:rgba(7,19,30,.75);color:#b9ccd8;font-size:12px}
+#stage{grid-area:2/2/3/3;position:relative;min-width:0;min-height:0;background:#05080e;overflow:hidden}
+#cesiumContainer{position:absolute;inset:0}
+#cesiumContainer canvas{filter:brightness(1.04) contrast(1.03) saturate(1.04)}
+.cesium-widget-credits{opacity:.34;font-size:9px!important}
+.cesium-credit-logoContainer{display:none!important}
+.cesium-viewer-bottom{left:auto!important;right:10px!important;bottom:8px!important}
+.cesium-viewer-scaleBar{display:block!important;opacity:.62;bottom:26px!important}
+
+#stage::after{content:"";position:absolute;inset:0;pointer-events:none;z-index:5;
+  box-shadow:inset 0 0 90px rgba(4,7,11,.85)}
+.corner{position:absolute;width:22px;height:22px;pointer-events:none;z-index:6;opacity:.7}
+.corner.tl{left:6px;top:6px;border-top:1px solid var(--line-3);border-left:1px solid var(--line-3)}
+.corner.tr{right:6px;top:6px;border-top:1px solid var(--line-3);border-right:1px solid var(--line-3)}
+.corner.bl{left:6px;bottom:6px;border-bottom:1px solid var(--line-3);border-left:1px solid var(--line-3)}
+.corner.br{right:6px;bottom:6px;border-bottom:1px solid var(--line-3);border-right:1px solid var(--line-3)}
+
+/* 场景内机位标签 */
+#boards{position:absolute;inset:0;z-index:7;pointer-events:none;overflow:hidden}
+.chip{position:absolute;left:0;top:0;transform:translate(-50%,-100%);
+  pointer-events:auto;cursor:pointer;padding:2px 7px;border-radius:2px;
+  background:rgba(5,12,18,.86);border:1px solid rgba(56,189,248,.35);
+  font-family:var(--mono);font-size:10.5px;line-height:1.35;color:#b9d8ee;
+  white-space:nowrap;transition:border-color var(--dur),background var(--dur),opacity var(--dur)}
+.chip::after{content:"";position:absolute;left:50%;top:100%;width:1px;height:8px;
+  background:linear-gradient(180deg,rgba(56,189,248,.6),transparent)}
+.chip:hover{border-color:var(--line-3);color:#fff}
+.chip.on{border-color:var(--cyan);color:#7ff0cd;background:rgba(4,26,32,.94);
+  box-shadow:0 0 12px -2px rgba(34,211,238,.8)}
+.chip .c-cap{color:#b8d4e4;font-size:10px;font-weight:400}
+body[data-view="layout"] .chip .c-sub{display:block}
+.chip .c-sub{display:none;color:var(--t3);font-size:9px}
+.chip.dim{opacity:.42}
+.chip.hide{display:none}
+
+.card-pop{position:absolute;left:0;top:0;transform:translate(-50%,-100%);
+  pointer-events:auto;min-width:158px;padding:7px 9px 8px;border-radius:2px;
+  background:rgba(5,14,20,.96);border:1px solid var(--line-3);
+  box-shadow:0 10px 30px rgba(0,0,0,.6),0 0 22px -8px rgba(34,211,238,.6);
+  font-family:var(--mono);font-size:10.5px;line-height:1.5;color:#dcecf8;
+  white-space:nowrap;transition:opacity var(--dur)}
+.card-pop::after{content:"";position:absolute;left:50%;top:100%;width:1px;height:10px;
+  background:linear-gradient(180deg,var(--cyan),transparent)}
+.card-pop .cd-head{display:flex;align-items:baseline;justify-content:space-between;gap:10px;
+  color:var(--cyan);font-weight:600;font-size:11.5px;margin-bottom:3px}
+.card-pop .cd-head em{font-style:normal;font-size:9px;color:var(--t3);font-weight:400}
+.card-pop .cd-l{display:flex;justify-content:space-between;gap:12px;color:var(--t3)}
+.card-pop .cd-l b{color:#e6f0fa;font-weight:500}
+.card-pop .cd-l b.a{color:var(--green)}
+.card-pop .cd-l i{font-style:normal;font-size:8.5px;color:var(--t3);margin-left:1px}
+.card-pop .cd-sep{margin:4px 0 3px;border-top:1px dashed rgba(56,189,248,.2)}
+.card-pop .cd-co{font-size:8.5px;color:var(--t3);line-height:1.4}
+.card-pop.clamped::after{display:none}
+.card-pop.hide{display:none}
+
+/* ============================== 底部控制台 ============================== */
+.console{grid-area:3/2/4/3;display:flex;flex-direction:column;min-width:0;min-height:0;
+  background:var(--panel);border-top:1px solid var(--line);position:relative;z-index:22}
+.console::before{content:"";position:absolute;left:0;right:0;top:-1px;height:1px;
+  background:linear-gradient(90deg,transparent,rgba(47,157,255,.55) 20%,rgba(47,224,160,.45) 80%,transparent)}
+
+.cs-head{height:30px;flex:none;display:flex;align-items:center;gap:12px;padding:0 6px 0 9px;
+  border-bottom:1px solid var(--line);
+  background:linear-gradient(90deg,rgba(47,157,255,.16),rgba(47,157,255,.02) 50%,transparent)}
+.cs-head .ch-t{font-size:12px;font-weight:600;letter-spacing:1px;color:#d8ecff;white-space:nowrap;
+  display:flex;align-items:center;gap:8px}
+.cs-head .ch-t::before{content:"";width:3px;height:12px;
+  background:linear-gradient(180deg,var(--cyan),var(--blue));box-shadow:0 0 10px rgba(34,211,238,.8)}
+.cs-head .ch-e{font-size:8.5px;letter-spacing:1.2px;color:rgba(56,189,248,.55);font-family:var(--mono)}
+.cs-head .sp{flex:1}
+.cs-meta{font-size:9.5px;color:var(--t3);font-family:var(--mono);white-space:nowrap}
+.console.collapsed .cs-body{display:none}
+.console.collapsed .cs-head{gap:8px;padding:0 6px 0 8px}
+.console.collapsed .seg button{padding:2px 9px;font-size:10.5px}
+.console.collapsed .cs-meta{display:none}
+.console.collapsed .collapse-btn svg{transform:rotate(180deg)}
+
+.seg{display:flex;gap:1px;background:rgba(56,189,248,.06);padding:1px;flex:none}
+.seg button{padding:3px 12px;font-size:11px;color:var(--t2);letter-spacing:.5px;transition:all var(--dur)}
+.seg button:hover{color:#fff;background:rgba(47,157,255,.14)}
+.seg button.on{color:#04121b;font-weight:600;background:linear-gradient(120deg,#5fd0ff,#22d3ee)}
+
+.cs-body{flex:1;min-height:0;display:grid;
+  grid-template-columns:378px 214px minmax(230px,1fr) 138px;
+  gap:1px;background:var(--line-2)}
+.cs-col{background:var(--panel);padding:7px 10px 9px;display:flex;flex-direction:column;
+  min-width:0;min-height:0;overflow-y:auto;overflow-x:hidden}
+.col-t{display:flex;align-items:center;gap:6px;font-size:10px;color:var(--t2);
+  letter-spacing:1px;margin-bottom:5px;white-space:nowrap;flex:none}
+.col-t::before{content:"";width:2px;height:8px;background:var(--blue);opacity:.85}
+.col-t em{font-style:normal;color:var(--t3);opacity:.8;letter-spacing:.5px;font-family:var(--mono);
+  font-size:9px;margin-left:auto;max-width:52%;overflow:hidden;text-overflow:ellipsis}
+
+/* 底图源 */
+.bm-opt{display:flex;flex-direction:column;justify-content:center;min-height:40px;
+  padding:4px 6px;border:1px solid rgba(56,189,248,.16);
+  background:linear-gradient(180deg,rgba(47,157,255,.06),rgba(47,157,255,.01));
+  text-align:left;transition:all var(--dur);position:relative;overflow:hidden;min-width:0}
+.bm-opt b{font-weight:400;font-size:11px;color:#d6e8f7;white-space:nowrap;letter-spacing:-.2px;
+  overflow:hidden;text-overflow:ellipsis;line-height:1.35}
+.bm-opt em{font-style:normal;font-size:8px;color:var(--t3);font-family:var(--mono);letter-spacing:-.2px;
+  white-space:nowrap;overflow:hidden;text-overflow:ellipsis;line-height:1.25}
+.bm-opt:hover{border-color:var(--line-2);background:rgba(47,157,255,.14)}
+.bm-opt.on{border-color:rgba(34,211,238,.55);
+  background:linear-gradient(180deg,rgba(34,211,238,.20),rgba(47,157,255,.06))}
+.bm-opt.on b{color:#9beaff}
+.bm-opt.on::before{content:"";position:absolute;left:0;top:0;bottom:0;width:2px;
+  background:var(--cyan);box-shadow:0 0 10px var(--cyan)}
+.bm-opt.dis{opacity:.32;cursor:not-allowed}
+
+/* 开关行 */
+.sw-list{display:flex;flex-direction:column;gap:1px;min-height:0}
+.sw-list.two{display:grid;grid-template-columns:1fr 1fr;gap:2px 10px}
+/* 开关行：文字与开关同处一个边框内，整块即按钮 */
+.sw-row{display:flex;align-items:center;gap:8px;width:100%;min-width:0;
+  padding:3px 8px;margin-bottom:2px;position:relative;
+  border:1px solid rgba(56,189,248,.17);background:rgba(56,189,248,.04);
+  transition:border-color var(--dur),background var(--dur)}
+.sw-row:hover{border-color:rgba(56,189,248,.30);background:rgba(56,189,248,.09)}
+.sw-row.on{border-color:rgba(34,211,238,.40);
+  background:linear-gradient(90deg,rgba(34,211,238,.17),rgba(47,157,255,.04))}
+.sw-row.on::before{content:"";position:absolute;left:-1px;top:-1px;bottom:-1px;width:2px;
+  background:linear-gradient(180deg,var(--cyan),var(--blue));box-shadow:0 0 9px rgba(34,211,238,.9)}
+.sw-row .sr-l{display:flex;align-items:baseline;gap:6px;text-align:left;min-width:0;flex:1}
+.sw-row b{font-weight:400;font-size:11px;color:#cddfef;white-space:nowrap;line-height:1.3}
+.sw-row em{font-style:normal;font-size:8.5px;color:var(--t3);white-space:nowrap;
+  overflow:hidden;text-overflow:ellipsis;margin-left:auto;text-align:right;line-height:1.2}
+.sw-row.on b{color:#9beaff}
+.sw-row.on em{color:rgba(155,234,255,.55)}
+.sw-row .sw{margin-left:9px}
+
+.sw{width:30px;height:16px;background:rgba(56,189,248,.16);position:relative;flex:none;
+  border:1px solid rgba(56,189,248,.24);transition:all var(--dur)}
+.sw::after{content:"";position:absolute;top:1px;left:1px;width:12px;height:12px;
+  background:#7c94a8;transition:transform var(--dur),background var(--dur)}
+.sw.on{background:rgba(47,157,255,.28);border-color:rgba(34,211,238,.7);
+  box-shadow:0 0 10px -2px rgba(34,211,238,.8)}
+.sw.on::after{transform:translateX(14px);background:var(--cyan)}
+
+.wind-row{display:flex;align-items:center;justify-content:space-between;gap:8px;
+  padding:6px 4px 0;margin-top:6px;border-top:1px solid var(--line);font-size:9.5px;color:var(--t3)}
+.wind-row b{font-family:var(--mono);font-size:11px;color:var(--cyan);font-weight:500}
+.slider-row{display:grid;grid-template-columns:1fr auto;align-items:center;gap:3px 8px;
+  padding:4px 4px 0;flex:none}
+.slider-row span{font-size:9px;color:var(--t3);white-space:nowrap}
+.slider-row input[type=range]{grid-column:1/-1;width:100%;min-width:0;-webkit-appearance:none;
+  height:2px;outline:none;background:linear-gradient(90deg,rgba(34,211,238,.8),rgba(56,189,248,.2))}
+.slider-row input[type=range]::-webkit-slider-thumb{-webkit-appearance:none;width:10px;height:10px;
+  border-radius:50%;background:var(--cyan);cursor:pointer;box-shadow:0 0 10px rgba(34,211,238,.9)}
+.slider-row em{font-style:normal;font-family:var(--mono);font-size:10px;color:var(--cyan);
+  text-align:right;justify-self:end}
+.slider-row.hl{margin-top:2px;padding-top:6px;border-top:1px dashed rgba(56,189,248,.14)}
+.slider-row.hl input[type=range]{background:linear-gradient(90deg,rgba(47,224,160,.85),rgba(47,157,255,.2))}
+.slider-row.hl input[type=range]::-webkit-slider-thumb{background:var(--green);
+  box-shadow:0 0 10px rgba(47,224,160,.9)}
+.slider-row.hl em{color:var(--green)}
+
+/* 电量分布条 */
+.bars{display:grid;grid-template-columns:1fr 1fr;gap:2px 18px;flex:1;min-height:0;
+  align-content:center}
+.bar-row{display:grid;grid-template-columns:44px 1fr 52px;gap:7px;align-items:center;min-height:0}
+.bar-id{font-family:var(--mono);font-size:9.5px;color:var(--t3);text-align:right}
+.bar-track{height:8px;background:rgba(56,189,248,.09);position:relative;overflow:hidden}
+.bar-track i{position:absolute;left:0;top:0;bottom:0;
+  background:linear-gradient(90deg,#17618c,var(--cyan));transition:width .3s ease}
+.bar-track i.g{background:linear-gradient(90deg,#14654c,var(--green))}
+.bar-v{font-family:var(--mono);font-size:9.5px;color:#b9d8ee}
+
+/* 占位列 */
+.ph-col{display:flex;flex-direction:column}
+.ph-box{flex:1;border:1px dashed rgba(56,189,248,.18);display:flex;flex-direction:column;
+  align-items:center;justify-content:center;gap:4px;position:relative;overflow:hidden;min-height:0}
+.ph-box::before{content:"";position:absolute;inset:0;
+  background-image:repeating-linear-gradient(45deg,rgba(56,189,248,.055) 0 1px,transparent 1px 8px)}
+.ph-box span{font-size:9.5px;color:#4f6b80;letter-spacing:1px;position:relative}
+.ph-box em{font-style:normal;font-size:8px;color:#3d5566;font-family:var(--mono);
+  letter-spacing:.8px;position:relative}
+
+.legend{display:flex;flex-wrap:wrap;gap:2px 10px;padding:0 4px 5px;margin-bottom:3px;
+  border-bottom:1px solid var(--line);font-size:9px;color:var(--t3);flex:none}
+.legend .li{display:flex;align-items:center;gap:4px;white-space:nowrap}
+.legend i{width:10px;height:2px;flex:none}
+.legend i.dot{width:5px;height:5px;border-radius:50%;box-shadow:0 0 6px currentColor}
+
+/* ============================== 右列 ============================== */
+.rt-empty{padding:14px 11px;display:flex;flex-direction:column;gap:7px}
+.rt-empty .dot-line{display:flex;align-items:center;gap:7px;font-size:11px;color:var(--t3)}
+.rt-empty .dot-line i{width:5px;height:5px;background:var(--yellow);box-shadow:0 0 8px var(--yellow)}
+.rt-skel{display:flex;flex-direction:column;gap:5px;margin-top:3px}
+.rt-skel span{height:7px;background:linear-gradient(90deg,rgba(56,189,248,.12),rgba(56,189,248,.03));
+  display:block}
+
+.rt-title{display:flex;align-items:baseline;gap:8px;padding:8px 9px 4px}
+.rt-title .rid{font-family:var(--mono);font-size:19px;font-weight:700;color:var(--cyan);
+  letter-spacing:.6px;text-shadow:0 0 16px rgba(34,211,238,.5)}
+.rt-title .rsub{font-size:9.5px;color:var(--t3);font-family:var(--mono)}
+
+.metric-4{display:grid;grid-template-columns:1fr 1fr;gap:6px;padding:0 9px 8px}
+.metric-4 .kpi{padding:6px 8px 7px}
+.metric-4 .kpi-v b{font-size:15px;letter-spacing:-.5px}
+
+.btn-block{display:flex;align-items:center;justify-content:center;gap:6px;width:100%;
+  height:28px;font-size:11.5px;letter-spacing:.5px;color:#9beaff;
+  border:1px solid rgba(47,157,255,.4);background:rgba(47,157,255,.12);transition:all var(--dur)}
+.btn-block:hover{background:rgba(47,157,255,.24);color:#fff}
+.btn-block svg{width:13px;height:13px}
+.btn-wrap{padding:0 9px 8px}
+
+.alert{display:flex;gap:7px;padding:6px 9px;border-left:2px solid var(--yellow);
+  background:rgba(251,191,36,.07);margin-bottom:5px}
+.alert.a-red{border-left-color:var(--red);background:rgba(255,107,107,.08)}
+.alert.a-violet{border-left-color:var(--purple);background:rgba(167,139,250,.08)}
+.alert .a-i{font-family:var(--mono);font-size:9.5px;color:var(--yellow);flex:none;padding-top:1px}
+.alert.a-red .a-i{color:var(--red)} .alert.a-violet .a-i{color:var(--purple)}
+.alert .a-t{font-size:10.5px;line-height:1.45;color:#c4d8e8;min-width:0}
+.alert .a-t b{color:#eaf6ff;font-weight:500}
+.alert .a-t em{font-style:normal;color:var(--t3);font-family:var(--mono);font-size:9px}
+
+/* ============================== 演示模式 ============================== */
+body[data-present="1"]{--wl:0px;--wr:0px;--ht:0px;--hc:0px}
+body[data-present="1"] .topbar,
+body[data-present="1"] .side,
+body[data-present="1"] .console{display:none}
+body[data-present="1"] #stage{grid-area:1/1/4/4}
+body[data-present="1"] .corner{opacity:.35}
+
+.present-bar{position:absolute;left:50%;bottom:16px;transform:translateX(-50%);z-index:30;
+  display:none;align-items:center;gap:16px;padding:7px 10px 7px 16px;
+  background:rgba(5,12,18,.94);border:1px solid var(--line-2);
+  box-shadow:0 0 30px -10px rgba(47,157,255,.6);backdrop-filter:blur(12px)}
+body[data-present="1"] .present-bar{display:flex}
+.present-bar .pt{display:flex;align-items:baseline;gap:10px}
+.present-bar .pt b{font-size:13px;font-weight:600;letter-spacing:.5px}
+.present-bar .pt span{font-size:10px;color:var(--t3)}
+.present-bar .pi{display:flex;align-items:center;gap:8px}
+.present-bar .pi-n{font-family:var(--mono);font-size:11px;color:var(--t2);min-width:34px;text-align:center}
+.present-bar .nav{width:26px;height:26px;display:grid;place-items:center;color:var(--t2);font-size:15px;
+  border:1px solid var(--line);transition:all var(--dur)}
+.present-bar .nav:hover{background:rgba(47,157,255,.18);color:#fff;border-color:var(--line-3)}
+.present-bar .nav[disabled]{opacity:.3;cursor:not-allowed}
+
+.present-kpi{position:absolute;left:18px;bottom:18px;z-index:30;display:none;gap:24px;
+  padding:10px 18px;background:rgba(5,12,18,.9);border:1px solid var(--line);
+  backdrop-filter:blur(12px)}
+body[data-present="1"] .present-kpi{display:flex}
+.present-kpi .pk-k{display:block;font-size:9px;color:var(--t3);letter-spacing:.5px}
+.present-kpi .pk-v{font-family:var(--mono);font-size:20px;font-weight:600;color:#9beaff}
+.present-kpi .pk-v i{font-style:normal;font-size:9px;color:var(--t3);margin-left:2px}
+
+/* ============================== 提示 / 加载 ============================== */
+#toast{position:fixed;left:50%;top:64px;transform:translateX(-50%);z-index:80;
+  padding:8px 16px;font-size:12px;line-height:1.5;max-width:min(560px,80vw);
+  background:rgba(6,14,20,.97);border:1px solid rgba(251,191,36,.45);color:#ffe9b6;
+  box-shadow:0 10px 30px rgba(0,0,0,.6);opacity:0;visibility:hidden;transition:opacity .2s,visibility .2s}
+#toast.show{opacity:1;visibility:visible}
+#toast.err{border-color:rgba(255,107,107,.5);color:#ffd7d7}
+
+#loader{position:fixed;inset:0;z-index:90;display:grid;place-items:center;
+  background:radial-gradient(circle at 50% 42%,#08131c 0%,#04070b 72%);
+  transition:opacity .5s ease,visibility .5s}
+#loader.hide{opacity:0;visibility:hidden}
+.ld{width:320px;text-align:center}
+.ld-mark{width:42px;height:42px;margin:0 auto 16px;display:grid;place-items:center;
+  border:1px solid rgba(47,157,255,.5);background:rgba(47,157,255,.10);position:relative}
+.ld-mark::before{content:"";position:absolute;inset:4px;border:1px solid rgba(34,211,238,.25)}
+.ld-mark svg{width:20px;height:20px;position:relative}
+@keyframes ldspin{to{transform:rotate(360deg)}}
+.ld-title{font-size:13px;letter-spacing:2px;color:#dcefff;margin-bottom:5px}
+.ld-sub{font-size:10px;color:var(--t3);font-family:var(--mono);min-height:14px;letter-spacing:.5px}
+.ld-bar{margin-top:14px;height:2px;background:rgba(56,189,248,.14);overflow:hidden}
+.ld-bar i{display:block;height:100%;width:0;
+  background:linear-gradient(90deg,var(--blue),var(--cyan),var(--green));transition:width .3s ease}
+.err-box{max-width:480px;padding:22px 24px;text-align:left;border:1px solid rgba(255,107,107,.35);
+  background:rgba(28,10,12,.92);color:#ffd9d9;line-height:1.7;font-size:12px}
+.err-box h3{color:#ff9b9b;font-size:14px;margin-bottom:8px;font-weight:600}
+.err-box code{font-family:var(--mono);background:rgba(0,0,0,.4);padding:1px 5px;font-size:11px}
+
+.collapse-btn{width:22px;height:22px;flex:none;display:grid;place-items:center;color:var(--t3);
+  border:1px solid transparent;transition:all var(--dur)}
+.collapse-btn:hover{color:var(--cyan);border-color:var(--line-2);background:var(--blue-d)}
+.collapse-btn svg{width:13px;height:13px;transition:transform .22s ease}
+
+/* ============================== 响应式 ============================== */
+@media (max-width:1700px){
+  :root{--wl:302px;--wr:302px;--hc:242px}
+  .cs-body{grid-template-columns:344px 206px minmax(200px,1fr) 122px}
+  /* 电量条在中等屏改单列，两列时数值列放不下会顶到相邻栏 */
+  .bars{grid-template-columns:1fr;gap:1px}
+}
+/* 1500 以下：底栏从 5 栏减为 4 栏，底图改 2 列，避免每格被压到截字 */
+@media (max-width:1500px){
+  :root{--wl:282px;--wr:282px;--hc:230px}
+  .brand-text h1{font-size:14px}
+  .kpi-v b{font-size:20px}
+  .cs-body{grid-template-columns:296px 186px minmax(170px,1fr)}
+  .cs-col.ph-col{display:none}
+  .cs-col .legend{display:none}
+}
+@media (max-width:1360px){
+  :root{--wl:262px;--wr:262px;--ht:48px;--hc:222px}
+  .nav .tab{padding:0 11px;font-size:11.5px}
+  .cs-body{grid-template-columns:264px 172px minmax(140px,1fr)}
+  .brand-text h1{font-size:13px}
+  .col-head .ch-s{display:none}
+}
+@media (max-height:800px){
+  .kpi-v b{font-size:16px}
+  .card-b{padding:6px 8px}
+  .col-body{padding:6px 6px 2px;gap:6px}
+  .cs-col{padding:5px 8px 7px}
+  .bm-opt{min-height:32px}
+}
+@media (prefers-reduced-motion:reduce){
+  *{transition-duration:.01ms!important;animation-duration:.01ms!important}
+}
+
+#dock .dock-pane[hidden]{display:none}
+#dock .dock-pane{grid-template-columns:minmax(220px,1fr) minmax(320px,2fr);overflow:auto}
+#dock .display-settings{grid-template-columns:repeat(3,minmax(240px,1fr))}
+#dock .display-settings .cs-col{overflow-y:auto;min-height:0}
+#dockTabs button.on{background:var(--cyan);color:#04212b}
+
+/* Display controls must keep their height inside the scrollable bottom dock. */
+#dock .display-settings .cs-col > *{flex-shrink:0}
+#dock .display-settings .sw-list{flex:none;margin-bottom:10px}
+#dock .display-settings .sw-row{min-height:30px}
+#dock .display-settings .slider-row{grid-template-columns:minmax(0,1fr) auto;grid-template-rows:auto auto;row-gap:10px;padding:8px 4px 10px;margin:0;min-height:54px;box-sizing:border-box}
+#dock .display-settings .slider-row > label,
+#dock .display-settings .slider-row > span{grid-column:1;grid-row:1;font-size:11px;line-height:18px;color:var(--t2)}
+#dock .display-settings .slider-row > em{grid-column:2;grid-row:1;line-height:18px}
+#dock .display-settings .slider-row > input[type=range]{grid-column:1/-1;grid-row:2;margin:4px 0;height:3px}
+#dock .display-settings .slider-row:has(input[type=color]){grid-template-rows:32px;min-height:48px;align-items:center;border-top:1px solid var(--line)}
+#dock .display-settings input[type=color]{grid-column:2;grid-row:1;align-self:center;margin:0}
+#dock .display-settings .kv{margin-top:8px}
+.road-width-row{display:flex;align-items:center;justify-content:space-between;gap:12px;padding:8px 4px;font-size:11px;color:var(--t2)}
+.road-width-row input{width:80px;padding:5px 7px;color:var(--cyan);background:var(--panel);border:1px solid var(--line);border-radius:3px}
+#dockContextStats{margin:0;overflow:auto;min-height:0}
+#trendBars.context-bars{overflow:auto;align-content:start;padding-top:8px;gap:10px 18px}
+#trendBars.context-bars .bar-row{min-height:20px;grid-template-columns:110px 1fr 48px}
+#turbineSceneControls[hidden],#dockContextStats[hidden]{display:none}
+#hourlyEnergyPanel{flex:1;min-height:180px;display:flex;flex-direction:column}
+#hourlyEnergyPanel[hidden],#trendBars[hidden]{display:none}
+.energy-filters{display:flex;gap:12px;align-items:center;font-size:11px;color:var(--t2);flex-wrap:wrap}
+.energy-filters select{background:#102839;color:#d1e9f6;border:1px solid var(--line);padding:3px}
+.energy-filters span{color:var(--t3);font-size:10px}
+#energyCanvas{width:100%;height:140px;min-height:100px;flex:1;cursor:crosshair}
+#energyChartNote{font-size:11px;color:var(--cyan);padding:3px 0;min-height:20px}
+.north-compass{position:absolute;right:18px;top:18px;width:72px;height:72px;z-index:8;pointer-events:none;filter:drop-shadow(0 2px 6px rgba(0,0,0,.35))}
+.north-compass svg{width:100%;height:100%;display:block}
+.hourly-timeline{flex:none;border-top:1px solid var(--line);padding-top:5px}
+.hourly-time-head{display:flex;align-items:center;gap:10px;font-size:11px;color:var(--cyan)}
+#hourTimeline{width:100%;height:16px;accent-color:#22d3ee;cursor:ew-resize}
+.hour-power-grid{display:grid;grid-template-columns:repeat(4,minmax(85px,1fr));gap:3px 10px;font-size:11px;color:#bedae9}
+.hour-model-note{font-size:10px;color:var(--t3);line-height:1.5;margin-top:4px}
+.c-power{display:block;color:#ffcf6a;font-size:11px;white-space:nowrap}
+#hourlyEnergyPanel{overflow:auto;min-height:210px}
+.c-power[hidden],.cd-hour[hidden]{display:none!important}
+#dock .hourly-page{grid-template-columns:minmax(0,1fr)}
+#dock .hourly-page .cs-col{overflow:auto}
+.hourly-page .hourly-timeline{border:0;display:flex;flex-direction:column;gap:8px;min-height:0}
+.hourly-page .hourly-time-head{font-size:13px;gap:16px}
+.hourly-page .hour-power-grid{grid-template-columns:repeat(4,minmax(130px,1fr));gap:8px 14px}
+.hourly-page .hour-power-grid>span{padding:10px 12px;border:1px solid var(--line);background:rgba(34,211,238,.05);font-size:13px}
+.hourly-page #hourTimeline{height:22px}
+.hourly-page .hour-model-note{font-size:11px}
+
+/* Keep the energy chart within the available dock height. */
+#hourlyEnergyPanel{min-height:0;overflow:hidden;flex:1;gap:3px}
+#hourlyEnergyPanel .energy-filters{flex:none;gap:6px 10px;line-height:20px}
+#energyCanvas{display:block;flex:1 1 90px;height:90px;min-height:45px;max-height:125px}
+#energyChartNote{flex:none;min-height:16px;line-height:16px;padding:1px 0;font-size:10px}
+[data-dock-pane="scene"]>.cs-col{min-height:0;overflow:hidden}
+
+.hourly-page .hour-power-grid>span.hour-power-card{padding:7px 10px;display:flex;flex-direction:column;gap:5px}
+.hour-card-heading{display:flex;justify-content:space-between;align-items:center;gap:8px;font-size:12px}
+.hour-card-heading b{font-weight:500;color:#dcf3ff}
+.hour-card-track{display:block;height:6px;background:rgba(83,151,181,.18);overflow:hidden;border-radius:2px}
+.hour-card-track i{display:block;height:100%;width:0;background:linear-gradient(90deg,#159cc6,#2fe0a0)}
+.hour-card-ratio{font-size:10px;color:#7ee3de;text-align:right;line-height:12px}
+.hourly-page .hourly-timeline{gap:5px}
+.hourly-page .hour-power-grid{gap:6px 12px}
+
+/* Compact hourly power cards: bar and text share the same row. */
+.hourly-page .hour-power-grid>span.hour-power-card{position:relative;display:block;padding:0;min-height:34px;overflow:hidden;background:rgba(18,51,66,.65)}
+.hour-power-card .hour-card-track{position:absolute;inset:0;height:100%;border-radius:0;background:transparent}
+.hour-power-card .hour-card-track i{height:100%;background:linear-gradient(90deg,rgba(12,125,156,.65),rgba(23,180,147,.65))}
+.hour-power-card .hour-card-heading{position:relative;z-index:1;height:34px;padding:0 10px;justify-content:flex-start;gap:10px;color:#f0fbff;text-shadow:0 1px 3px #062432;font-size:12px;pointer-events:none}
+.hour-power-card .hour-card-heading b{flex:1;white-space:nowrap}
+.hour-power-card .hour-card-heading>span{margin-right:48px;white-space:nowrap}
+.hour-power-card .hour-card-ratio{position:absolute;right:9px;top:0;z-index:1;line-height:34px;font-size:11px;color:#edffff;text-shadow:0 1px 3px #062432;pointer-events:none}
+
+.annual-axis{position:relative;padding:23px 8px 0;margin:0 0 6px;--axis-progress:0%;--axis-bubble-left:0%;}
+.axis-bubble{position:absolute;top:0;left:clamp(52px,var(--axis-bubble-left),calc(100% - 52px));transform:translateX(-50%);color:#b6f6ff;background:#103f52;border:1px solid #227389;border-radius:4px;font:10px var(--mono);padding:3px 7px;white-space:nowrap;pointer-events:none}
+.hourly-page #hourTimeline{display:block;width:100%;height:6px;margin:5px 0 0;appearance:none;-webkit-appearance:none;border-radius:4px;outline:none;background:linear-gradient(90deg,#22d3ee 0%,#18a7c0 var(--axis-progress),#173545 var(--axis-progress),#173545 100%);cursor:ew-resize}
+#hourTimeline::-webkit-slider-thumb{appearance:none;-webkit-appearance:none;width:14px;height:14px;border:2px solid #c3f8ff;border-radius:50%;background:#22cbe3;box-shadow:0 0 0 4px rgba(34,211,238,.13),0 0 9px rgba(34,211,238,.45)}
+#hourTimeline::-moz-range-thumb{width:10px;height:10px;border:2px solid #c3f8ff;border-radius:50%;background:#22cbe3}
+#hourTimeline:focus-visible{box-shadow:0 0 0 2px #83eaf7}
+.axis-months{position:relative;height:29px;margin:0 6px}
+.axis-month{position:absolute;top:0;height:27px;border-left:1px solid #416779;box-sizing:border-box;padding-top:10px;cursor:pointer;background:none;color:#789eae;font:10px sans-serif;border-top:0;border-bottom:0;border-right:0;text-align:center}
+.axis-month.active{color:#8ef2ff;background:linear-gradient(rgba(34,211,238,.1),transparent);font-weight:bold}
+.axis-month:hover{color:#fff;background:rgba(34,211,238,.12)}
+.axis-months::after{content:'';position:absolute;right:0;top:0;height:7px;border-right:1px solid #416779}
+.hourly-panel-title{display:flex;align-items:center;gap:12px;flex-wrap:wrap}
+.hourly-panel-title .farm-power-badge{margin-left:auto;font-size:13px;color:#6fe9ef;letter-spacing:0;padding:3px 9px;border:1px solid rgba(34,211,238,.25);border-radius:4px;background:rgba(34,211,238,.08)}
+.hourly-panel-title em{margin-left:0}
+</style>
+<link rel="icon" type="image/svg+xml" href="data/wind-turbine-icon.svg">
+</head>
+<body data-view="overview" data-present="0">
+
+<header class="topbar">
+  <div class="brand">
+    <div class="brand-mark">
+      <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 32 32" fill="#22d3ee" role="img" aria-label="风机剪影"><path d="M15.3 13h1.4l1.1 17h-3.6z"/><g><path d="M15.5 11.7 14.8 8.2 16.2 1h1.1l.3 7.5-1.1 3.2z"/><path d="M15.5 11.7 14.8 8.2 16.2 1h1.1l.3 7.5-1.1 3.2z" transform="rotate(120 16 12)"/><path d="M15.5 11.7 14.8 8.2 16.2 1h1.1l.3 7.5-1.1 3.2z" transform="rotate(240 16 12)"/></g><circle cx="16" cy="12" r="1.65"/></svg>
+    </div>
+    <div class="brand-text">
+      <h1>风电项目</h1>
+    </div>
+  </div>
+
+  <nav class="nav" id="tabs">
+    <button class="tab on" data-tab="overview">场址总览</button>
+    <button class="tab" data-tab="layout">电量分析</button>
+    <button class="tab" data-tab="gridline">集电线路</button>
+    <button class="tab" data-tab="roads">道路</button>
+  </nav>
+
+  <div class="top-right">
+    <button class="btn-hz" id="btnPresent" title="进入汇报模式">
+      <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.6" stroke-linecap="round">
+        <rect x="2.5" y="4.5" width="19" height="12.5" rx="1.5"/><path d="M8 21h8M12 17v4"/></svg>
+      <span>演示</span>
+    </button>
+    <button class="icon-btn on" id="btnLayers" title="展开/收起控制台 (C)">
+      <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.6" stroke-linecap="round">
+        <path d="M3 7.5 12 3l9 4.5-9 4.5-9-4.5Z"/><path d="M3 12l9 4.5 9-4.5"/><path d="M3 16.5 12 21l9-4.5"/></svg>
+    </button>
+    <button class="icon-btn" id="btnFull" title="全屏 (F)">
+      <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.6" stroke-linecap="round">
+        <path d="M4 9V4h5M20 9V4h-5M4 15v5h5M20 15v5h-5"/></svg>
+    </button>
+    <button class="icon-btn" id="btnHome" title="复位视角 (R)">
+      <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.6" stroke-linecap="round">
+        <path d="M3 11l9-7 9 7M6 10.2V20h12v-9.8"/></svg>
+    </button>
+
+    <div class="bm-wrap" id="bmWrap">
+      <button class="btn-hz bm-btn" id="btnBase" title="切换底图源">
+        <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.6" stroke-linecap="round">
+          <path d="M3 7.5 12 3l9 4.5-9 4.5-9-4.5Z"/><path d="M3 12l9 4.5 9-4.5"/><path d="M3 16.5 12 21l9-4.5"/></svg>
+        <span id="bmCur">卫星影像</span>
+        <svg class="car" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"
+             stroke-linecap="round" stroke-linejoin="round"><path d="M6 9l6 6 6-6"/></svg>
+      </button>
+      <div class="bm-pop" id="bmPop"></div>
+    </div>
+  </div>
+</header>
+
+<!-- ============================== 左列 ============================== -->
+<aside class="side left" id="panelLeft">
+  <div class="col-head">
+    <span class="ch-t" id="panelTitle">场址信息</span>
+    <em class="ch-e" id="panelSub">SITE INFO</em>
+    <span class="sp"></span>
+    <span class="ch-s" id="panelCount">8 台 · 60 MW</span>
+    <button class="collapse-btn" id="panelCollapse" title="收起左栏 (L)">
+      <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"
+           stroke-linecap="round" stroke-linejoin="round"><path d="M14 6 8 12l6 6"/></svg>
+    </button>
+  </div>
+
+  <div class="col-body">
+
+    <div class="lp on" data-lp="overview">
+      <section class="card">
+        <div class="card-h"><i class="idx">01</i><h3>场址概况</h3><em>OVERVIEW</em></div>
+        <div class="card-b">
+          <div class="kpi-grid">
+            <div class="kpi hl"><span class="kpi-k">装机容量</span>
+              <div class="kpi-v"><b id="kCap">—</b><i>MW</i></div></div>
+            <div class="kpi"><span class="kpi-k">风电机组</span>
+              <div class="kpi-v"><b id="kNum">—</b><i>台</i></div></div>
+            <div class="kpi"><span class="kpi-k">年上网电量</span>
+              <div class="kpi-v"><b id="kAep">—</b><i>GWh</i></div></div>
+            <div class="kpi"><span class="kpi-k">等效满发</span>
+              <div class="kpi-v"><b id="kHours">—</b><i>h</i></div></div>
+          </div>
+        </div>
+      </section>
+
+      <section class="card">
+        <div class="card-h"><i class="idx">02</i><h3>场址条件</h3><em>SITE CONDITION</em></div>
+        <div class="card-b" style="padding:6px 9px 8px">
+          <dl class="kv">
+            <div><dt>场址位置</dt><dd class="txt" id="projectLocation">项目配置位置</dd></div>
+            <div><dt>场区范围</dt><dd><span id="vExtent">—</span></dd></div>
+            <div><dt>控制范围面积</dt><dd><span id="vArea">—</span><span class="u">km²</span></dd></div>
+            <div><dt>地面高程</dt><dd><span id="vElev">—</span><span class="u">m</span></dd></div>
+            <div><dt>平均坡度</dt><dd><span id="vSlope">—</span><span class="u">°</span></dd></div>
+          </dl>
+        </div>
+      </section>
+
+      <section class="card">
+        <div class="card-h"><i class="idx">03</i><h3>机组参数</h3><em>TURBINE</em></div>
+        <div class="card-b" style="padding:6px 9px 8px">
+          <dl class="kv">
+            <div><dt>单机容量</dt><dd><span id="vUnit">—</span><span class="u">MW</span></dd></div>
+            <div><dt>轮毂高度</dt><dd><span id="vHub">—</span><span class="u">m</span></dd></div>
+            <div><dt>叶轮直径</dt><dd><span id="vRotor">—</span><span class="u">m</span></dd></div>
+            <div><dt>装机密度</dt><dd><span id="vDensity">—</span><span class="u">MW/km²</span></dd></div>
+          </dl>
+        </div>
+      </section>
+
+      <section class="card">
+        <div class="card-h"><i class="idx">04</i><h3>场区与间距</h3><em>LAYOUT</em></div>
+        <div class="card-b" style="padding:6px 9px 8px">
+          <dl class="kv">
+            <div><dt>最小机间距</dt><dd class="ac"><span id="tMinDist">—</span><span class="u">m</span></dd></div>
+            <div><dt>折合叶轮倍数</dt><dd><span id="tMinD">—</span><span class="u">D</span></dd></div>
+            <div><dt>最小间距机位</dt><dd class="txt"><span id="tMinPair">—</span></dd></div>
+          </dl>
+        </div>
+      </section>
+      <section class="card"><div class="card-h"><i class="idx">05</i><h3>风机参数表</h3><em>SPECIFICATIONS</em></div>
+      <div class="card-b" id="machineParameterTable" style="max-height:310px;overflow:auto"></div></section>
+    </div>
+
+    <div class="lp" data-lp="layout">
+      <section class="card grow" style="display:flex;flex-direction:column">
+        <div class="card-h"><i class="idx">01</i><h3>机组电量</h3><em>ENERGY</em>
+          <span class="tag g" id="listHint">按电量</span></div>
+        <div class="list-head">
+          <span class="hint">条形按年上网电量区间归一化</span>
+          <button class="link-btn" id="btnSort">切换排序</button>
+        </div>
+        <ul class="wt-list" id="wtList" style="flex:1;overflow-y:auto;min-height:0"></ul>
+        <div class="list-stat" id="listStat"></div>
+      </section>
+
+      <section class="card">
+        <div class="card-h"><i class="idx">02</i><h3>间距与位置</h3><em>SPACING</em></div>
+        <div class="card-b" style="padding:6px 9px 8px">
+          <dl class="kv">
+            <div><dt>最小机间距</dt><dd class="ac"><span id="tMinDist2">—</span><span class="u">m</span></dd></div>
+            <div><dt>折合叶轮倍数</dt><dd><span id="tMinD2">—</span><span class="u">D</span></dd></div>
+            <div><dt>机位对</dt><dd class="txt"><span id="tMinPair2">—</span></dd></div>
+          </dl>
+        </div>
+      </section>
+    </div>
+
+    <div class="lp" data-lp="gridline">
+      <section class="card"><div class="card-h"><i class="idx">01</i><h3>线路概况</h3><em>35 kV</em></div>
+        <div class="card-b"><dl class="kv" id="gridSummary"></dl></div>
+      </section>
+      <section class="card"><div class="card-h"><i class="idx">02</i><h3>分线统计</h3><em>ROUTES</em></div>
+        <div class="card-b" id="gridRoutes"></div>
+      </section>
+      <section class="card grow" style="display:flex;flex-direction:column;min-height:160px"><div class="card-h"><i class="idx">03</i><h3>杆塔信息</h3><em>TOWERS</em></div>
+        <div class="card-b" id="gridTowerList" style="overflow:auto;flex:1"></div>
+      </section>
+    </div>
+    <div class="lp" data-lp="roads">
+      <section class="card"><div class="card-h"><i class="idx">01</i><h3>场内新建道路</h3><em>ROADS</em></div>
+      <div class="card-b"><dl class="kv">
+      <div><dt>道路总长</dt><dd id="roadLength">—</dd></div>
+      <div><dt>路径数量</dt><dd id="roadCount">—</dd></div>
+      <div><dt>路面宽度</dt><dd id="roadWidth">6 m</dd></div>
+      <div><dt>路面做法</dt><dd>山皮石</dd></div>
+      <div><dt>路径来源</dt><dd>道路.dxf</dd></div>
+      </dl></div></section>
+      <section class="card grow" style="display:flex;flex-direction:column;min-height:160px"><div class="card-h"><i class="idx">03</i><h3>道路分段</h3><em>SEGMENTS</em></div><div class="card-b" id="roadList" style="overflow:auto;flex:1"></div></section>
+    </div>
+
+  </div>
+</aside>
+
+<button class="edge left" id="panelReveal" title="展开左栏 (L)"><i>面板</i></button>
+<button class="edge right" id="panelRevealR" title="展开右栏"><i>详情</i></button>
+
+<!-- ============================== 三维场景 ============================== -->
+<main id="stage">
+  <div id="cesiumContainer"></div>
+  <div class="nav-hint">中键拖动：平移 · 滚轮：缩放 · Shift＋中键：旋转</div>
+  <div id="boards"></div>
+  <div class="north-compass" role="img" aria-label="指北针，箭头指向地理北方" title="地理北向">
+    <svg viewBox="0 0 80 80" aria-hidden="true">
+      <circle cx="40" cy="40" r="35" fill="rgba(6,20,32,.82)" stroke="rgba(107,177,211,.5)"/>
+      <path d="M40 7v5M40 68v5M7 40h5M68 40h5" stroke="#779eb6"/>
+      <g id="northNeedle">
+        <text x="40" y="23" text-anchor="middle" fill="#f1f8fc" font-size="13" font-family="sans-serif" font-weight="bold">N</text>
+        <path d="M40 27 31 55 40 48Z" fill="#22d3ee"/>
+        <path d="M40 27 49 55 40 48Z" fill="#e6f3fa"/>
+      </g>
+
+    </svg>
+  </div>
+  <i class="corner tl"></i><i class="corner tr"></i><i class="corner bl"></i><i class="corner br"></i>
+</main>
+
+<!-- ============================== 底部控制台 ============================== -->
+<section class="console" id="dock">
+  <div class="cs-head">
+    <span class="ch-t">场景控制</span>
+    <div class="seg" id="dockTabs" role="tablist" aria-label="底部控制台">
+      <button class="on" data-dock="scene" role="tab" aria-selected="true">场景</button>
+      <button data-dock="hourly" role="tab" aria-selected="false">逐时功率</button>
+      <button data-dock="display" role="tab" aria-selected="false">显示设置</button>
+    </div>
+    <div class="seg" id="segView">
+      <button data-view="overview" class="on">全场</button>
+      <button data-view="top">顶视</button>
+      <button data-view="oblique">斜视</button>
+    </div>
+    <span class="sp"></span>
+    <span class="cs-meta" id="dockMeta">实测机位数据 · ASTER 30 m 地形</span>
+    <button class="collapse-btn" id="dockCollapse" title="收起控制台 (C)">
+      <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"
+           stroke-linecap="round" stroke-linejoin="round"><path d="M6 15l6-6 6 6"/></svg>
+    </button>
+  </div>
+
+  <div class="cs-body dock-pane" data-dock-pane="scene">
+    <div class="cs-col">
+      <div class="col-t"><span id="dockContextTitle">场景</span><em id="dockContextSub">SCENE</em></div>
+      <div id="turbineSceneControls">
+      <div class="sw-list" id="sceneList"></div>
+      <div class="slider-row">
+        <span>叶轮转速</span>
+        <input type="range" id="spinSpeed" min="0.2" max="2" step="0.1" value="1">
+        <em id="spinVal">1.0×</em>
+      </div>
+      <div class="wind-row"><span>主导风向</span><b>NW · 315°</b></div>
+      </div><dl class="kv" id="dockContextStats" hidden></dl>
+    </div>
+
+    <div class="cs-col">
+      <div class="col-t"><span id="dockChartTitle">机位年上网电量</span><em id="dockChartUnit">MWh</em></div>
+      <div class="bars" id="trendBars"></div>
+      <div id="hourlyEnergyPanel" hidden>
+        <div class="energy-filters"><label>视图 <select id="energyGranularity"><option value="hour">逐时</option><option value="day" selected>逐日</option><option value="month">月度</option></select></label>
+        <label>月份 <select id="energyMonth"><option value="0">全年</option><option value="1">1月</option><option value="2">2月</option><option value="3">3月</option><option value="4">4月</option><option value="5">5月</option><option value="6">6月</option><option value="7">7月</option><option value="8">8月</option><option value="9">9月</option><option value="10">10月</option><option value="11">11月</option><option value="12">12月</option></select></label><button id="energyResetRange" type="button" class="link-btn" title="恢复月份筛选内的完整区间">重置区间</button><span>滚轮缩放 · 双击重置 · 原始kWh · 年份未注明</span></div>
+        <canvas id="energyCanvas" aria-label="风场发电量曲线"></canvas>
+        <div id="energyChartNote" aria-live="polite"></div>
+
+      </div>
+    </div>
+
+
+  </div>
+  <div class="cs-body dock-pane hourly-page" data-dock-pane="hourly" hidden>
+    <div class="cs-col"><div class="col-t hourly-panel-title">风机逐时功率 <span id="hourFarmPower" class="farm-power-badge"></span><em>HOURLY POWER · MW</em></div>
+        <div class="hourly-timeline">
+          <div class="annual-axis" id="annualAxis">
+            <div class="axis-bubble" id="axisBubble">01/01 00:00</div>
+            <input type="range" id="hourTimeline" min="0" max="8759" step="1" value="0" aria-label="风场逐小时时间轴">
+            <div class="axis-months" id="axisMonths"></div>
+          </div>
+          <div id="hourTurbinePower" class="hour-power-grid"></div>
+          <div class="hour-model-note">单机功率为估算：按额定容量×等效小时加权分配全场出力，超额部分分配给未满载机组；非单机实测。功率为该小时平均值。</div>
+        </div>
+    </div>
+  </div>
+  <div class="cs-body dock-pane display-settings" data-dock-pane="display" hidden>
+    <div class="cs-col"><div class="col-t">风机 <em>TURBINES</em></div><div class="sw-list" id="windLayerList"></div>
+      <div class="slider-row hl">
+        <span>风机放大</span>
+        <input type="range" id="scaleRange" min="1" max="5" step="0.1" value="2">
+        <em id="scaleVal">2.0×</em>
+      </div>
+    </div>
+    <div class="cs-col"><div class="col-t">集电线路 <em>GRID</em></div><div class="sw-list" id="gridLayerList"></div>
+      <div class="slider-row hl">
+        <span>集电线路放大</span>
+        <input type="range" id="gridScaleRange" min="1" max="5" step="0.1" value="2" aria-label="集电线路放大倍数">
+        <em id="gridScaleVal">2.0×</em>
+      </div>
+    </div>
+    <div class="cs-col"><div class="col-t">道路 <em>ROADS</em></div><div class="sw-list" id="roadLayerList"></div>
+
+        <div class="slider-row"><label for="roadColor">附着颜色</label><input id="roadColor" type="color" value="#ffb020" style="width:56px;height:28px;cursor:pointer"></div>
+        <div class="road-width-row"><label for="roadWidthInput">道路宽度（米）</label><input id="roadWidthInput" type="number" min="1" max="60" step="0.1" value="6"></div>
+        <div class="slider-row"><label for="roadScale">宽度倍率</label><input id="roadScale" type="range" min="1" max="10" step="0.1" value="1"><em id="roadScaleVal">1.0×</em></div>
+        <div class="slider-row"><label for="roadTransparency">透明度</label><input id="roadTransparency" type="range" min="0" max="100" step="1" value="10"><em id="roadTransparencyVal">10%</em></div>
+        <dl class="kv"><div><dt>显示宽度</dt><dd id="roadDisplayWidth">6.0 m</dd></div></dl>
+        <div style="font-size:11px;color:var(--t3);padding-top:6px">默认宽度6米；显示宽度＝设置宽度×倍率。透明度0%为不透明，100%为完全透明。</div>
+    </div>
+  </div>
+
+</section>
+
+<!-- ============================== 右列 ============================== -->
+<aside class="side right" id="panelRight">
+  <div class="col-head">
+    <span class="ch-t">机位详情</span>
+    <em class="ch-e">TURBINE DETAIL</em>
+    <span class="sp"></span>
+    <button class="collapse-btn" id="panelCollapseR" title="收起右栏">
+      <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"
+           stroke-linecap="round" stroke-linejoin="round"><path d="M10 6l6 6-6 6"/></svg>
+    </button>
+  </div>
+
+  <div class="col-body" id="rightBody">
+
+    <div id="rightEmpty">
+      <section class="card">
+        <div class="card-h"><i class="idx">01</i><h3>机位详情</h3><em>SELECT</em>
+          <span class="tag">待选</span></div>
+        <div class="rt-empty">
+          <div class="dot-line"><i></i>未选择机位</div>
+          <div style="font-size:10.5px;color:var(--t3);line-height:1.5">
+            单击场景中的风机，或「电量分析」清单中的任一行，此处显示该机位完整参数。
+          </div>
+          <div class="rt-skel"><span style="width:82%"></span><span style="width:64%"></span>
+            <span style="width:74%"></span></div>
+        </div>
+      </section>
+
+      <section class="card ph grow">
+        <div class="card-h"><i class="idx">02</i><h3>风况与发电</h3><em>WIND &amp; ENERGY</em></div>
+        <div class="ph-b"><span>选中机位后填充</span><em>WAITING</em></div>
+      </section>
+
+      <section class="card ph grow">
+        <div class="card-h"><i class="idx">03</i><h3>工程坐标</h3><em>COORDINATE</em></div>
+        <div class="ph-b"><span>选中机位后填充</span><em>WAITING</em></div>
+      </section>
+    </div>
+
+    <div id="rightDetail" style="display:none">
+      <section class="card">
+        <div class="card-h"><i class="idx">01</i><h3>机位详情</h3><em>IDENTITY</em>
+          <span class="tag g" id="dSub">—</span></div>
+        <div class="rt-title">
+          <span class="rid" id="dId">—</span>
+          <span class="rsub" id="dCap">—</span>
+          <button class="collapse-btn" id="dClose" title="取消选中 (Esc)" style="margin-left:auto">
+            <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"
+                 stroke-linecap="round"><path d="M6 6l12 12M18 6L6 18"/></svg>
+          </button>
+        </div>
+        <div class="metric-4">
+          <div class="kpi"><span class="kpi-k">地面高程</span>
+            <div class="kpi-v"><b id="dGround">—</b><i>m</i></div></div>
+          <div class="kpi"><span class="kpi-k">轮毂海拔</span>
+            <div class="kpi-v"><b id="dHub">—</b><i>m</i></div></div>
+          <div class="kpi"><span class="kpi-k">平均风速</span>
+            <div class="kpi-v"><b id="dV">—</b><i>m/s</i></div></div>
+          <div class="kpi hl"><span class="kpi-k">年上网电量</span>
+            <div class="kpi-v"><b id="dNet">—</b><i>MWh</i></div></div>
+        </div>
+        <div class="btn-wrap">
+          <button class="btn-block" id="btnFocus">
+            <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.6" stroke-linecap="round">
+              <circle cx="12" cy="12" r="3"/><path d="M12 2v3.5M12 18.5V22M2 12h3.5M18.5 12H22"/></svg>
+            进入单机视角
+          </button>
+        </div>
+      </section>
+
+      <section class="card">
+        <div class="card-h"><i class="idx">02</i><h3>风况与发电</h3><em>WIND &amp; ENERGY</em></div>
+        <div class="card-b" style="padding:6px 9px 8px">
+          <dl class="kv">
+            <div><dt>尾流后风速</dt><dd><span id="dVw">—</span><span class="u">m/s</span></dd></div>
+            <div><dt>理论发电量</dt><dd><span id="dGross">—</span><span class="u">MWh</span></dd></div>
+            <div><dt>尾流损失</dt><dd class="warn"><span id="dWake">—</span><span class="u">%</span></dd></div>
+            <div><dt>等效满发小时</dt><dd class="ac"><span id="dHours">—</span><span class="u">h</span></dd></div>
+            <div><dt>容量系数（净）</dt><dd><span id="dCf">—</span><span class="u">%</span></dd></div>
+            <div><dt>综合折减</dt><dd class="warn"><span id="dRed">—</span><span class="u">%</span></dd></div>
+          </dl>
+        </div>
+      </section>
+
+      <section class="card">
+        <div class="card-h"><i class="idx">03</i><h3>工程坐标</h3><em>COORDINATE</em></div>
+        <div class="card-b" style="padding:6px 9px 8px">
+          <dl class="kv">
+            <div><dt>E（2000）</dt><dd><span id="dE">—</span></dd></div>
+            <div><dt>N（2000）</dt><dd><span id="dN">—</span></dd></div>
+            <div><dt>经度</dt><dd><span id="dLon">—</span><span class="u">°E</span></dd></div>
+            <div><dt>纬度</dt><dd><span id="dLat">—</span><span class="u">°N</span></dd></div>
+            <div><dt>轮毂高度</dt><dd><span id="dHubH">—</span><span class="u">m</span></dd></div>
+            <div><dt>地形模型高程</dt><dd><span id="dDem">—</span><span class="u">m</span></dd></div>
+            <div><dt>DEM 与实测差</dt><dd><span id="dDiff">—</span><span class="u">m</span></dd></div>
+            <div><dt>机位坡度</dt><dd><span id="dSlope">—</span><span class="u">°</span></dd></div>
+          </dl>
+        </div>
+      </section>
+    </div>
+
+  </div>
+</aside>
+
+<!-- 演示模式 -->
+<div class="present-bar">
+  <div class="pt"><b id="pTitle">项目总览</b><span id="pSub"></span></div>
+  <div class="pi">
+    <button class="nav" id="pPrev" title="上一场景 (←)">‹</button>
+    <span class="pi-n" id="pIdx">1 / 5</span>
+    <button class="nav" id="pNext" title="下一场景 (→)">›</button>
+    <button class="btn-hz" id="pExit" style="margin-left:6px;height:26px">退出演示</button>
+  </div>
+</div>
+<div class="present-kpi" id="presentKpi"></div>
+
+<div id="toast"></div>
+
+<div id="loader">
+  <div class="ld">
+    <div class="ld-mark">
+      <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 32 32" fill="#22d3ee" role="img" aria-label="风机剪影"><path d="M15.3 13h1.4l1.1 17h-3.6z"/><g><path d="M15.5 11.7 14.8 8.2 16.2 1h1.1l.3 7.5-1.1 3.2z"/><path d="M15.5 11.7 14.8 8.2 16.2 1h1.1l.3 7.5-1.1 3.2z" transform="rotate(120 16 12)"/><path d="M15.5 11.7 14.8 8.2 16.2 1h1.1l.3 7.5-1.1 3.2z" transform="rotate(240 16 12)"/></g><circle cx="16" cy="12" r="1.65"/></svg>
+    </div>
+    <div class="ld-title">正在构建三维场景</div>
+    <div class="ld-sub" id="ldSub">加载三维引擎…</div>
+    <div class="ld-bar"><i id="ldBar"></i></div>
+  </div>
+</div>
+
+<script src="js/config.js"></script>
+<script src="js/config.local.js" onerror="this.remove()"></script>
+<script src="data/site-data.js?v=rotor220"></script>
+<script src="js/tower-sj1.js?v=compact-timeline-2"></script>
+<script src="js/tower-j1.js?v=compact-timeline-2"></script>
+<script src="js/tower-layout.js?v=route-3"></script>
+<script src="js/terrain.js"></script>
+<script src="js/turbine-mesh.js?v=1"></script>
+<script src="js/energy-chart.js?v=perf-5"></script>
+<script src="js/hourly-dispatch.js?v=1"></script>
+<script src="js/app.js?v=compact-timeline-2"></script>
+</body>
+</html>

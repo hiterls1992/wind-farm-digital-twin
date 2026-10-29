@@ -1,0 +1,46 @@
+{
+  "project": {
+    "name": "新建风电数字孪生项目",
+    "location": "请填写项目位置"
+  },
+  "crs": {
+    "datum": "CGCS2000",
+    "zone": null,
+    "band_width": 3,
+    "east_column": "X",
+    "prefixed_easting": true
+  },
+  "files": {
+    "turbines": "风电场.xlsx",
+    "gridline": null,
+    "roads": null,
+    "hourly_energy": null
+  },
+  "sheets": {
+    "turbines": "电量数据",
+    "gridline": "2000坐标",
+    "machine": "风机参数"
+  },
+  "turbine": {
+    "rotor_d_m": null,
+    "wind_azimuth_deg": 315
+  },
+  "grid": {
+    "chains": [],
+    "links": [],
+    "double_circuit_prefixes": [],
+    "conductor": {
+      "model": "待确认",
+      "name": "待确认"
+    },
+    "min_turbine_distance_m": 30
+  },
+  "roads": {
+    "width_m": 6,
+    "coordinate_unit": "m"
+  },
+  "hourly": {
+    "unit": "kWh",
+    "calendar": "non-leap-yearless"
+  }
+}

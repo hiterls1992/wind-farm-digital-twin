@@ -16,6 +16,7 @@
   3) 单机容量由「年上网电量 / 等效满发小时数」反算，不写死。
 """
 import json
+from project_io import ROOT, atomic_text, write_json, finite, validate_levels, validate_assets
 import math
 import os
 import sys
@@ -26,15 +27,15 @@ sys.path.insert(0, os.path.dirname(os.path.abspath(__file__)))
 from coord2000 import en_to_lonlat, lonlat_to_en          # noqa: E402
 from coord_transform import wgs84_to_gcj02                # noqa: E402
 
-SRC_XLSX = "风场数据/风电场.xlsx"
-OUT_JSON = "data/site.json"
-SHEET = "风机数据"
+SRC_XLSX = ROOT / "风场数据/风电场.xlsx"
+OUT_JSON = ROOT / "data/site.json"
+SHEET = "电量数据"
 
 ZONE = 38                  # CGCS2000 3° 带号，中央经线 114°E
 BAND_WIDTH = 3
 
 # 机型参数中数据表未给出的部分，集中在此，便于一处修改
-ROTOR_D = 195.0            # 叶轮直径 m（推断值：按 250 W/m² 比功率反推，D = 2√(A/π)）
+ROTOR_D = 220.0            # 叶轮直径默认值，随后由风机参数表更新
 
 
 def norm(s):
@@ -290,8 +291,8 @@ def main():
             "rated_kw": rated_kw,
             "rated_mw": round(rated_mw, 3),
             "rotor_d": ROTOR_D,
-            "rotor_d_note": "数据表未给出叶轮直径，按 250 W/m² 比功率反推 D = 2√(A/π) ≈ 195 m，"
-                            "机型确定后须据实修正",
+            "rotor_d_override_m": None,
+            "rotor_d_note": "按风机参数表更新",
             "hub_h": turbines[0]["hub_h"],
             "count": len(turbines),
         },
@@ -327,7 +328,7 @@ def main():
     }
 
     os.makedirs("data", exist_ok=True)
-    with open(OUT_JSON, "w", encoding="utf-8") as f:
+    with atomic_text(OUT_JSON) as f:
         json.dump(site, f, ensure_ascii=False, indent=1)
 
     # ---------- 控制台核对表

@@ -1,0 +1,4 @@
+interface:
+  display_name: "风机建模与标签"
+  short_description: "建立参数驱动的风机塔筒、连续翼型叶片、机舱及设备标签。"
+  default_prompt: "使用 $windfarm-turbines 处理当前项目的风机建模与标签。"

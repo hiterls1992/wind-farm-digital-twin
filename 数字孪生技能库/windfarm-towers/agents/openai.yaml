@@ -1,0 +1,4 @@
+interface:
+  display_name: "铁塔与导线建模"
+  short_description: "依据铁塔结构图建立单/双回路角钢塔，连接导线、绝缘子串和跳线。"
+  default_prompt: "使用 $windfarm-towers 处理当前项目的铁塔与导线建模。"

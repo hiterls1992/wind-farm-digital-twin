@@ -1,0 +1,4 @@
+interface:
+  display_name: "页面布局与交互"
+  short_description: "创建或调整风电数字孪生的三维主视图、侧栏、底部选项卡和设备显示控制。"
+  default_prompt: "使用 $windfarm-layout 处理当前项目的页面布局与交互。"

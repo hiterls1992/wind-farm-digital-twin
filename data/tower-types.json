@@ -1,0 +1,101 @@
+{
+ "types": {
+  "suspension": {
+   "id": "suspension",
+   "name": "35 kV 单回路直线塔",
+   "note": "典型值，参照国网 35kV 通用设计单回路直线塔",
+   "h_body": 19.0,
+   "h_total": 20.9,
+   "b_bot": 4.0,
+   "b_top": 1.2,
+   "arms": [
+    {
+     "z": 12.0,
+     "arm": 3.2,
+     "role": "side"
+    },
+    {
+     "z": 15.2,
+     "arm": 1.3,
+     "role": "mid"
+    },
+    {
+     "z": 19.0,
+     "arm": 1.5,
+     "role": "gw",
+     "rise": 1.9
+    }
+   ],
+   "base_size": 2.0,
+   "base_h": 0.5,
+   "model": "libs/models/tower_susp.glb",
+   "hooks": [
+    {
+     "z": 11.0,
+     "x": 3.2,
+     "phase": "side"
+    },
+    {
+     "z": 11.0,
+     "x": -3.2,
+     "phase": "side"
+    },
+    {
+     "z": 14.2,
+     "x": 0.0,
+     "phase": "mid"
+    }
+   ],
+   "ins": 1.0
+  },
+  "tension": {
+   "id": "tension",
+   "name": "35 kV 单回路耐张塔",
+   "note": "典型值，参照国网 35kV 通用设计单回路耐张转角塔",
+   "h_body": 21.0,
+   "h_total": 23.1,
+   "b_bot": 5.0,
+   "b_top": 1.4,
+   "arms": [
+    {
+     "z": 12.0,
+     "arm": 3.8,
+     "role": "side"
+    },
+    {
+     "z": 15.2,
+     "arm": 1.5,
+     "role": "mid"
+    },
+    {
+     "z": 21.0,
+     "arm": 1.8,
+     "role": "gw",
+     "rise": 2.1
+    }
+   ],
+   "base_size": 2.4,
+   "base_h": 0.6,
+   "model": "libs/models/tower_tens.glb",
+   "hooks": [
+    {
+     "z": 11.6,
+     "x": 3.8,
+     "phase": "side"
+    },
+    {
+     "z": 11.6,
+     "x": -3.8,
+     "phase": "side"
+    },
+    {
+     "z": 14.8,
+     "x": 0.0,
+     "phase": "mid"
+    }
+   ],
+   "ins": 1.2
+  }
+ },
+ "note": "塔型尺寸为典型值（国网 35kV 通用设计单回路塔），非本工程实测；接入施工图后须按实际塔型替换并重新生成模型"
+}

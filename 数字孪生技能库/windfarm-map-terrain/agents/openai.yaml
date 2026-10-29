@@ -1,0 +1,4 @@
+interface:
+  display_name: "卫星地图与地形"
+  short_description: "接入Cesium卫星底图、分级DEM、贴地几何及瓦片加载提示。"
+  default_prompt: "使用 $windfarm-map-terrain 处理当前项目的卫星地图与地形。"

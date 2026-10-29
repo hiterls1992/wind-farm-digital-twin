@@ -1,0 +1,4 @@
+interface:
+  display_name: "风场数字孪生总控"
+  short_description: "配置并创建风场数字孪生，统一协调数据接入、地图模型、电量分析与验收"
+  default_prompt: "使用 $windfarm-digital-twin 根据新的风场数据生成独立数字孪生项目。"

@@ -1,0 +1,4 @@
+interface:
+  display_name: "性能与交互验收"
+  short_description: "排查风电三维页面的标签、动画、曲线和批量几何卡顿并回归验证。"
+  default_prompt: "使用 $windfarm-performance 处理当前项目的性能与交互验收。"

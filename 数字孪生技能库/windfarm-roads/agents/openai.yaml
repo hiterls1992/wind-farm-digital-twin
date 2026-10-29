@@ -1,0 +1,4 @@
+interface:
+  display_name: "道路DXF贴地建模"
+  short_description: "把CAD道路中心线转换成米制宽度的贴地道路并设置外观。"
+  default_prompt: "使用 $windfarm-roads 处理当前项目的道路DXF贴地建模。"

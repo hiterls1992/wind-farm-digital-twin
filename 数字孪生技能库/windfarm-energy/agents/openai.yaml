@@ -1,0 +1,4 @@
+interface:
+  display_name: "8760曲线与单机出力"
+  short_description: "处理风场逐时电量并生成面积图、区间缩放及按小时的单机功率估算。"
+  default_prompt: "使用 $windfarm-energy 处理当前项目的8760曲线与单机出力。"

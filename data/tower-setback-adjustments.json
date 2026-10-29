@@ -1,0 +1,68 @@
+{
+  "minimum_distance_m": 30.155928107090087,
+  "adjustments": [
+    {
+      "id": "A14",
+      "reason": "距风机中心至少30米",
+      "survey_e": 38396450.2261,
+      "survey_n": 4476338.1342,
+      "shift_m": 21.746,
+      "nearest_turbine": "B97",
+      "distance_m": 30.229
+    },
+    {
+      "id": "A17",
+      "reason": "距风机中心至少30米",
+      "survey_e": 38396427.894,
+      "survey_n": 4475233.4872,
+      "shift_m": 21.899,
+      "nearest_turbine": "B98",
+      "distance_m": 30.203
+    },
+    {
+      "id": "A3",
+      "reason": "距风机中心至少30米",
+      "survey_e": 38395522.6368,
+      "survey_n": 4480132.3624,
+      "shift_m": 29.686,
+      "nearest_turbine": "B48",
+      "distance_m": 30.263
+    },
+    {
+      "id": "A3-6",
+      "reason": "距风机中心至少30米",
+      "survey_e": 38397195.7181,
+      "survey_n": 4480710.4532,
+      "shift_m": 29.657,
+      "nearest_turbine": "B40n",
+      "distance_m": 30.2
+    },
+    {
+      "id": "B10-2",
+      "reason": "距风机中心至少30米",
+      "survey_e": 38392411.601,
+      "survey_n": 4477162.316,
+      "shift_m": 29.694,
+      "nearest_turbine": "B100",
+      "distance_m": 30.156
+    },
+    {
+      "id": "B15",
+      "reason": "距风机中心至少30米",
+      "survey_e": 38393049.8796,
+      "survey_n": 4475785.0665,
+      "shift_m": 18.441,
+      "nearest_turbine": "B92n1",
+      "distance_m": 30.203
+    },
+    {
+      "id": "B7-3",
+      "reason": "距风机中心至少30米",
+      "survey_e": 38394755.378,
+      "survey_n": 4477812.431,
+      "shift_m": 29.591,
+      "nearest_turbine": "B44",
+      "distance_m": 30.179
+    }
+  ]
+}

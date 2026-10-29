@@ -1,0 +1,11 @@
+const fs=require('node:fs'),vm=require('node:vm'),assert=require('node:assert/strict');
+const source=fs.readFileSync(require('node:path').join(__dirname,'../js/energy-chart.js'),'utf8');
+const ctx={};vm.runInNewContext(source.slice(source.indexOf('  function zoomRange'),source.indexOf('  function draw()')),ctx);
+const zoom=ctx.zoomRange;
+let r=zoom(0,744,744,.5,.8,6);assert.equal(r[1]-r[0],595);assert.ok(Math.abs((r[0]+r[1])/2-372)<=.5);
+for(let i=0;i<100;i++)r=zoom(r[0],r[1],744,.9,.8,6);
+assert.equal(r[1]-r[0],6);assert.ok(r[0]>=0&&r[1]<=744);
+for(let i=0;i<100;i++)r=zoom(r[0],r[1],744,.1,1.25,6);
+assert.equal(r[0],0);assert.equal(r[1],744);
+assert.equal(zoom(0,1,1,.5,.8,6)[1],1);
+console.log('Energy zoom: cursor anchor, limits, minimum span and full-range recovery passed');

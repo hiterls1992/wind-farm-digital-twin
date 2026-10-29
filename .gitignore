@@ -11,3 +11,9 @@ venv/
 .DS_Store
 Thumbs.db
 *.log
+
+# Local browser logs, temporary validation projects and generated caches
+/tmp/
+/.playwright-cli/
+/.preview/
+/data/dem_*_progress.json

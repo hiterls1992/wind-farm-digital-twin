@@ -12,6 +12,9 @@
 输出：data/site.json
 """
 import json
+import argparse
+from pathlib import Path
+from project_io import ROOT, atomic_text
 import math
 
 A_AXIS = 6378137.0
@@ -33,7 +36,7 @@ TEMPLATE = [
 
 
 def load():
-    with open("data/dem.json", encoding="utf-8") as f:
+    with open(ROOT / "data/dem.json", encoding="utf-8") as f:
         return json.load(f)
 
 
@@ -100,7 +103,10 @@ def weibull_cf(v_mean=7.2, k=2.0, dv=0.05):
     return cf
 
 
-def main():
+def main(output=None):
+    output = Path(output) if output else ROOT / "data/scenarios/template-site.json"
+    if output.resolve() == (ROOT / "data/site.json").resolve():
+        raise ValueError("正式机位数据禁止覆盖，请选择方案目录")
     dem = load()
     l2 = dem["levels"]["L2"]
     lat0, lon0 = dem["center"]["lat"], dem["center"]["lon"]
@@ -220,7 +226,7 @@ def main():
             "annual_gwh": round(annual_mwh / 1000.0, 1),
         },
     }
-    with open("data/site.json", "w", encoding="utf-8") as f:
+    with atomic_text(output) as f:
         json.dump(site, f, ensure_ascii=False, indent=1)
 
     print("场区地形 %(min)s~%(max)s m  起伏 %(relief)s m  平均坡度 %(mean_slope)s  最大 %(max_slope)s" % site["terrain"])
@@ -234,4 +240,6 @@ def main():
 
 
 if __name__ == "__main__":
-    main()
+    parser = argparse.ArgumentParser(description="旧模板方案，仅输出独立方案文件")
+    parser.add_argument("--output")
+    main(parser.parse_args().output)
